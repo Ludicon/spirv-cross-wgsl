@@ -1,0 +1,33 @@
+struct SSBO
+{
+    a : i32,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read_write> _9 : SSBO;
+
+fn comp_main()
+{
+    _9.a += 10;
+    _9.a -= 10;
+    _9.a *= 10;
+    _9.a /= 10;
+    _9.a = _9.a << u32(2);
+    _9.a = _9.a >> u32(3);
+    _9.a &= 40;
+    _9.a ^= 10;
+    _9.a %= 40;
+    _9.a |= 1;
+    var c : bool = false;
+    var d : bool = true;
+    c = c && d;
+    d = d || c;
+    _9.a = select(0, 1, c && d);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

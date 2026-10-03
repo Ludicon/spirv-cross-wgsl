@@ -1,0 +1,37 @@
+const gl_WorkGroupSize : vec3u = vec3u(8u, 8u, 1u);
+
+@group(0) @binding(0) var uInput : texture_storage_2d<rgba8unorm, read>;
+@group(0) @binding(2) var uLayers : texture_storage_2d_array<r32float, read_write>;
+@group(0) @binding(1) var uOutput : texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var uVolume : texture_storage_3d<r32uint, write>;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    var coord : vec2i = bitcast<vec2i>(gl_GlobalInvocationID.xy);
+    var size : vec2i = vec2i(textureDimensions(uInput));
+    if (any(coord >= size))
+    {
+        return;
+    }
+    var _39 : vec4f = textureLoad(uInput, coord);
+    var c : vec4f = _39;
+    var _52 : vec4f = textureLoad(uLayers, vec3i(coord, 1).xy, vec3i(coord, 1).z);
+    var layer : f32 = _52.x;
+    textureStore(uLayers, vec3i(coord, 0).xy, vec3i(coord, 0).z, vec4f(layer * 2.0f));
+    textureStore(uOutput, coord, c * layer);
+    textureStore(uVolume, vec3i(coord, 2), vec4u(c * 255.0f));
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

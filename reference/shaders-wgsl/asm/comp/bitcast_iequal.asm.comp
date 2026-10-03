@@ -1,0 +1,38 @@
+struct _3
+{
+    _m0 : vec4i,
+    _m1 : vec4u,
+}
+
+struct _4
+{
+    _m0 : vec4u,
+    _m1 : vec4i,
+}
+
+@group(0) @binding(0) var<storage, read_write> _5 : _3;
+@group(0) @binding(1) var<storage, read_write> _6 : _4;
+
+fn comp_main()
+{
+    var _30 : vec4i = _5._m0;
+    var _31 : vec4u = _5._m1;
+    var _34 : vec4<bool> = bitcast<vec4i>(_31) == _30;
+    var _35 : vec4<bool> = _30 == bitcast<vec4i>(_31);
+    var _36 : vec4<bool> = _31 == _31;
+    var _37 : vec4<bool> = _30 == _30;
+    _6._m0 = select(vec4u(0u), vec4u(1u), _34);
+    _6._m0 = select(vec4u(0u), vec4u(1u), _35);
+    _6._m0 = select(vec4u(0u), vec4u(1u), _36);
+    _6._m0 = select(vec4u(0u), vec4u(1u), _37);
+    _6._m1 = select(vec4i(0), vec4i(1), _34);
+    _6._m1 = select(vec4i(0), vec4i(1), _35);
+    _6._m1 = select(vec4i(0), vec4i(1), _36);
+    _6._m1 = select(vec4i(0), vec4i(1), _37);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

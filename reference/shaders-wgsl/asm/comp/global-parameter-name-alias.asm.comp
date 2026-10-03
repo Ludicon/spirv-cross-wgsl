@@ -1,0 +1,39 @@
+struct ssbo
+{
+    _data : array<u32>,
+}
+
+@group(0) @binding(1) var<storage, read> ssbo_1 : ssbo;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn Load(size : u32)
+{
+    var byteAddrTemp : i32 = bitcast<i32>(size >> u32(2));
+    var data : vec4u = vec4u(ssbo_1._data[byteAddrTemp], ssbo_1._data[byteAddrTemp + 1], ssbo_1._data[byteAddrTemp + 2], ssbo_1._data[byteAddrTemp + 3]);
+}
+
+fn _main(id : vec3u)
+{
+    var param : u32 = 4u;
+    Load(param);
+}
+
+fn comp_main()
+{
+    var id : vec3u = gl_GlobalInvocationID;
+    var param : vec3u = id;
+    _main(param);
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

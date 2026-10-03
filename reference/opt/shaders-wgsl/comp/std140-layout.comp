@@ -1,0 +1,59 @@
+struct Item
+{
+    @size(16) weight : f32,
+}
+
+struct UBO
+{
+    weights : array<vec4f, 4>,
+    offsets : array<vec4f, 3>,
+    m2 : mat2x4f,
+    m32 : array<mat3x4f, 2>,
+    rm : mat4x4f,
+    rm23 : mat3x4f,
+    items : array<Item, 2>,
+    count : i32,
+}
+
+struct SSBO
+{
+    out_weights : array<vec4f, 4>,
+    out_m2 : mat2x4f,
+    out_rm : mat4x4f,
+    result : vec4f,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<uniform> ubo : UBO;
+@group(0) @binding(1) var<storage, read_write> ssbo : SSBO;
+
+fn comp_main()
+{
+    var _140 : f32;
+    _140 = 0.0f;
+    for (var _139 : i32 = 0; _139 < ubo.count; )
+    {
+        _140 += ((ubo.weights[_139].x * ubo.offsets[_139 % 3].y) + ubo.items[_139 & 1].weight);
+        _139++;
+        continue;
+    }
+    var _101 : vec4f = ((vec4f((mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy) * vec2f(_140)) + (mat3x2f(ubo.m32[1][0].xy, ubo.m32[1][1].xy, ubo.m32[1][2].xy) * vec3f(1.0f)), 0.0f, 1.0f) * ubo.rm) + vec4f(ubo.rm[0][1], ubo.rm[1][1], ubo.rm[2][1], ubo.rm[3][1])) + vec4f(ubo.rm[3u][2]);
+    ssbo.out_weights[1].x = _140;
+    ssbo.out_m2[0][0] = mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy)[0][0];
+    ssbo.out_m2[0][1] = mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy)[0][1];
+    ssbo.out_m2[1][0] = mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy)[1][0];
+    ssbo.out_m2[1][1] = mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy)[1][1];
+    ssbo.out_rm = transpose(transpose(ubo.rm));
+    ssbo.out_rm[0][3] = _101.x;
+    ssbo.out_rm[1][3] = _101.y;
+    ssbo.out_rm[2][3] = _101.z;
+    ssbo.out_rm[3][3] = _101.w;
+    ssbo.result = _101 + vec4f(vec2f(1.0f, 2.0f) * mat3x2f(ubo.rm23[0].xy, ubo.rm23[1].xy, ubo.rm23[2].xy), 0.0f);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

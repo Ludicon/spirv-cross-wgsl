@@ -1,0 +1,53 @@
+struct SSBO
+{
+    data : f32,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+var<private> _188 : f32;
+
+@group(0) @binding(0) var<storage, read_write> _11 : SSBO;
+
+fn comp_main()
+{
+    if (_11.data != 0.0f)
+    {
+        _11.data = 10.0f;
+    }
+    else
+    {
+        _11.data = 15.0f;
+    }
+    switch (i32(_11.data))
+    {
+        case 0:
+        {
+            _11.data = 20.0f;
+            break;
+        }
+        case 1:
+        {
+            _11.data = 30.0f;
+            break;
+        }
+        default:
+        {
+            break;
+        }
+    }
+    var _185 : f32;
+    _185 = _188;
+    for (var _184 : i32 = 0; _184 < 20; )
+    {
+        _185 += 10.0f;
+        _184++;
+        continue;
+    }
+    _11.data = _185;
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

@@ -1,0 +1,28 @@
+struct BUF
+{
+    values : array<i32>,
+}
+
+@group(0) @binding(0) var<storage, read_write> _8 : BUF;
+
+var<private> gl_WorkGroupID : vec3i;
+var<private> gl_GlobalInvocationID : vec3i;
+
+fn comp_main()
+{
+    _8.values[bitcast<i32>(gl_WorkGroupID.y)] = bitcast<i32>(gl_GlobalInvocationID.z);
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(workgroup_id) gl_WorkGroupID : vec3u,
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_WorkGroupID = vec3i(stage_input.gl_WorkGroupID);
+    gl_GlobalInvocationID = vec3i(stage_input.gl_GlobalInvocationID);
+    comp_main();
+}

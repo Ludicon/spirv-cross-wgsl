@@ -1,0 +1,39 @@
+struct SSBO
+{
+    in_data : array<f32>,
+}
+
+struct SSBO2
+{
+    out_data : array<f32>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(4u, 1u, 1u);
+
+@group(0) @binding(0) var<storage, read> _22 : SSBO;
+@group(0) @binding(1) var<storage, read_write> _44 : SSBO2;
+
+var<private> gl_GlobalInvocationID : vec3u;
+var<private> gl_LocalInvocationIndex : u32;
+var<workgroup> sShared : array<f32, 4>;
+
+fn comp_main()
+{
+    sShared[gl_LocalInvocationIndex] = _22.in_data[gl_GlobalInvocationID.x];
+    workgroupBarrier();
+    _44.out_data[gl_GlobalInvocationID.x] = sShared[3u - gl_LocalInvocationIndex];
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+    @builtin(local_invocation_index) gl_LocalInvocationIndex : u32,
+}
+
+@compute @workgroup_size(4, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    gl_LocalInvocationIndex = stage_input.gl_LocalInvocationIndex;
+    comp_main();
+}

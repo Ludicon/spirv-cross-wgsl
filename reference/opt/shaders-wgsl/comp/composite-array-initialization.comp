@@ -1,0 +1,47 @@
+struct Data
+{
+    a : f32,
+    b : f32,
+}
+
+const _25 : array<Data, 2> = array<Data, 2>(Data(1.0f, 2.0f), Data(3.0f, 4.0f));
+@id(0) override X : f32 = 4.0f;
+
+struct Data_1
+{
+    a : f32,
+    b : f32,
+}
+
+struct SSBO
+{
+    outdata : array<Data_1>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(2u, 1u, 1u);
+
+@group(0) @binding(0) var<storage, read_write> _53 : SSBO;
+
+var<private> gl_WorkGroupID : vec3u;
+var<private> gl_LocalInvocationID : vec3u;
+
+fn comp_main()
+{
+    var data2 : array<Data, 2> = array<Data, 2>(Data(X, 2.0f), Data(3.0f, 5.0f));
+    _53.outdata[gl_WorkGroupID.x].a = _25[gl_LocalInvocationID.x].a + data2[gl_LocalInvocationID.x].a;
+    _53.outdata[gl_WorkGroupID.x].b = _25[gl_LocalInvocationID.x].b + data2[gl_LocalInvocationID.x].b;
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(workgroup_id) gl_WorkGroupID : vec3u,
+    @builtin(local_invocation_id) gl_LocalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(2, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_WorkGroupID = stage_input.gl_WorkGroupID;
+    gl_LocalInvocationID = stage_input.gl_LocalInvocationID;
+    comp_main();
+}

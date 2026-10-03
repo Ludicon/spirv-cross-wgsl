@@ -1,0 +1,61 @@
+@id(0) override _13 : u32 = 1u;
+override _19 : u32 = vec3u(_13, 2u, 1u).x;
+override _20 : u32 = vec3u(_13, 2u, 1u).y;
+override _21 : u32 = (_19 * _20);
+
+struct SSBO
+{
+    data : array<f32>,
+}
+
+@id(1) override COUNT : i32 = 4;
+override DOUBLE_COUNT : i32 = (COUNT * 2);
+override _62 : u32 = vec3u(_13, 2u, 1u).x;
+override _63 : u32 = vec3u(_13, 2u, 1u).y;
+override _64 : u32 = (_62 * _63);
+@id(3) override ENABLE : bool = true;
+@id(2) override SCALE : f32 = 2.0f;
+
+@group(0) @binding(0) var<storage, read_write> ssbo : SSBO;
+
+var<private> gl_LocalInvocationIndex : u32;
+var<private> gl_GlobalInvocationID : vec3u;
+var<workgroup> cache : array<f32, _21>;
+
+fn comp_main()
+{
+    cache[gl_LocalInvocationIndex] = ssbo.data[gl_GlobalInvocationID.x];
+    workgroupBarrier();
+    var _84 : f32;
+    _84 = 0.0f;
+    for (var _83 : i32 = 0; _83 < DOUBLE_COUNT; )
+    {
+        _84 += cache[(gl_LocalInvocationIndex + bitcast<u32>(_83)) % _64];
+        _83++;
+        continue;
+    }
+    var _85 : f32;
+    if (ENABLE)
+    {
+        _85 = _84 * SCALE;
+    }
+    else
+    {
+        _85 = _84;
+    }
+    ssbo.data[gl_GlobalInvocationID.x] = _85;
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+    @builtin(local_invocation_index) gl_LocalInvocationIndex : u32,
+}
+
+@compute @workgroup_size(_13, 2, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    gl_LocalInvocationIndex = stage_input.gl_LocalInvocationIndex;
+    comp_main();
+}

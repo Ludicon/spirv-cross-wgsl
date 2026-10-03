@@ -51,6 +51,7 @@ let package = Package(
                       "shaders-reflection",
                       "shaders-ue4",
                       "shaders-ue4-no-opt",
+                      "shaders-wgsl",
                       "test_shaders.py",
                       "test_shaders.sh",
                       "tests-other",
@@ -65,7 +66,8 @@ let package = Package(
                       "spirv_hlsl.cpp",
                       "spirv_msl.cpp",
                       "spirv_parser.cpp",
-                      "spirv_reflect.cpp"],
+                      "spirv_reflect.cpp",
+                      "spirv_wgsl.cpp"],
             publicHeadersPath: "."),
     ],
     cxxLanguageStandard: .cxx14

@@ -1,0 +1,44 @@
+#version 450
+layout(local_size_x = 1) in;
+
+struct Item
+{
+	float weight;
+};
+
+layout(std140, binding = 0) uniform UBO
+{
+	float weights[4];
+	vec2 offsets[3];
+	mat2 m2;
+	mat3x2 m32[2];
+	layout(row_major) mat4 rm;
+	layout(row_major) mat2x3 rm23;
+	Item items[2];
+	int count;
+} ubo;
+
+layout(std140, binding = 1) buffer SSBO
+{
+	float out_weights[4];
+	mat2 out_m2;
+	layout(row_major) mat4 out_rm;
+	vec4 result;
+} ssbo;
+
+void main()
+{
+	float s = 0.0;
+	for (int i = 0; i < ubo.count; i++)
+		s += ubo.weights[i] * ubo.offsets[i % 3].y + ubo.items[i & 1].weight;
+
+	vec2 v = ubo.m2 * vec2(s) + ubo.m32[1] * vec3(1.0);
+	vec4 c = ubo.rm * vec4(v, 0.0, 1.0) + ubo.rm[1] + vec4(ubo.rm[2][3]);
+	vec3 r = ubo.rm23 * vec2(1.0, 2.0);
+
+	ssbo.out_weights[1] = s;
+	ssbo.out_m2 = ubo.m2;
+	ssbo.out_rm = ubo.rm;
+	ssbo.out_rm[3] = c;
+	ssbo.result = c + vec4(r, 0.0);
+}

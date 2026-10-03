@@ -1,0 +1,46 @@
+struct SSBO
+{
+    m22 : mat2x2f,
+    m23 : mat2x3f,
+    m24 : mat2x4f,
+    m32 : mat3x2f,
+    m33 : mat3x3f,
+    m34 : mat3x4f,
+    m42 : mat4x2f,
+    m43 : mat4x3f,
+    m44 : mat4x4f,
+}
+
+struct ReadSSBO
+{
+    v2 : vec2f,
+    v3 : vec3f,
+    v4 : vec4f,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read_write> _21 : SSBO;
+@group(0) @binding(1) var<storage, read> _26 : ReadSSBO;
+
+fn comp_main()
+{
+    var _29 : vec2f = _26.v2;
+    _21.m22 = mat2x2f(_29 * _29.x, _29 * _29.y);
+    var _38 : vec3f = _26.v3;
+    _21.m23 = mat2x3f(_38 * _29.x, _38 * _29.y);
+    var _47 : vec4f = _26.v4;
+    _21.m24 = mat2x4f(_47 * _29.x, _47 * _29.y);
+    _21.m32 = mat3x2f(_29 * _38.x, _29 * _38.y, _29 * _38.z);
+    _21.m33 = mat3x3f(_38 * _38.x, _38 * _38.y, _38 * _38.z);
+    _21.m34 = mat3x4f(_47 * _38.x, _47 * _38.y, _47 * _38.z);
+    _21.m42 = mat4x2f(_29 * _47.x, _29 * _47.y, _29 * _47.z, _29 * _47.w);
+    _21.m43 = mat4x3f(_38 * _47.x, _38 * _47.y, _38 * _47.z, _38 * _47.w);
+    _21.m44 = mat4x4f(_47 * _47.x, _47 * _47.y, _47 * _47.z, _47 * _47.w);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

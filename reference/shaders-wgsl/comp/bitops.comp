@@ -1,0 +1,29 @@
+struct SSBO
+{
+    i : vec4i,
+    u : vec4u,
+    shift : i32,
+    ushift : u32,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read_write> ssbo : SSBO;
+
+fn comp_main()
+{
+    var a : vec4i = ssbo.i;
+    var b : vec4u = ssbo.u;
+    ssbo.i = ((a << vec4u(vec4i(ssbo.shift))) + (a >> vec4u(vec4i(bitcast<i32>(ssbo.ushift))))) + bitcast<vec4i>(b >> vec4u(3u));
+    ssbo.u = (b << vec4u(2u)) ^ (b >> vec4u(vec4i(ssbo.shift)));
+    ssbo.i += (((extractBits(a, u32(1), u32(4)) + firstTrailingBit(a)) + bitcast<vec4i>(firstLeadingBit(b))) + bitcast<vec4i>(countOneBits(b)));
+    ssbo.u += ((insertBits(b, vec4u(7u), u32(4), u32(3)) + reverseBits(b)) + extractBits(b, u32(ssbo.shift), u32(2)));
+    ssbo.u.x += (pack4x8unorm(vec4f(0.5f)) + pack2x16float(vec2f(1.0f, 2.0f)));
+    ssbo.i.x += bitcast<i32>(unpack2x16snorm(ssbo.u.y).x);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

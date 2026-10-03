@@ -1,0 +1,153 @@
+struct S0
+{
+    a : array<vec2f, 1>,
+    @size(8) b : f32,
+}
+
+struct S1
+{
+    a : vec3f,
+    b : f32,
+}
+
+struct S2
+{
+    a : array<vec3f, 1>,
+    @size(16) b : f32,
+}
+
+struct S3
+{
+    a : vec2f,
+    b : f32,
+}
+
+struct S4
+{
+    c : vec2f,
+}
+
+struct Content
+{
+    m0s : array<S0, 1>,
+    m1s : array<S1, 1>,
+    m2s : array<S2, 1>,
+    m0 : S0,
+    m1 : S1,
+    m2 : S2,
+    m3 : S3,
+    m4 : f32,
+    @size(72) m3s : array<S4, 8>,
+}
+
+struct SSBO1
+{
+    content : Content,
+    content1 : array<Content, 2>,
+    content2 : Content,
+    m0 : mat2x2f,
+    m1 : mat2x2f,
+    m2 : array<mat2x3f, 4>,
+    m3 : mat3x2f,
+    m4 : mat2x2f,
+    m5 : array<mat2x2f, 9>,
+    m6 : array<array<mat3x2f, 2>, 4>,
+    m7 : mat2x3f,
+    _array : array<f32>,
+}
+
+struct S0_1
+{
+    a : array<vec4f, 1>,
+    @size(16) b : f32,
+}
+
+struct S1_1
+{
+    a : vec3f,
+    b : f32,
+}
+
+struct S2_1
+{
+    a : array<vec3f, 1>,
+    @size(16) b : f32,
+}
+
+struct S3_1
+{
+    a : vec2f,
+    b : f32,
+}
+
+struct S4_1
+{
+    @size(16) c : vec2f,
+}
+
+struct Content_1
+{
+    m0s : array<S0_1, 1>,
+    m1s : array<S1_1, 1>,
+    m2s : array<S2_1, 1>,
+    m0 : S0_1,
+    m1 : S1_1,
+    m2 : S2_1,
+    m3 : S3_1,
+    @size(16) m4 : f32,
+    m3s : array<S4_1, 8>,
+}
+
+struct SSBO0
+{
+    content : Content_1,
+    content1 : array<Content_1, 2>,
+    content2 : Content_1,
+    m0 : mat2x4f,
+    m1 : mat2x4f,
+    m2 : array<mat2x3f, 4>,
+    m3 : mat3x4f,
+    m4 : mat2x4f,
+    m5 : array<mat2x4f, 9>,
+    m6 : array<array<mat3x4f, 2>, 4>,
+    m7 : mat2x3f,
+    _array : array<vec4f>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(1) var<storage, read_write> ssbo_430 : SSBO1;
+@group(0) @binding(0) var<storage, read_write> ssbo_140 : SSBO0;
+
+fn comp_main()
+{
+    ssbo_430.content.m0s[0].a[0] = ssbo_140.content.m0s[0].a[0].xy;
+    ssbo_430.content.m0s[0].b = ssbo_140.content.m0s[0].b;
+    ssbo_430.content.m1s[0].a = ssbo_140.content.m1s[0].a;
+    ssbo_430.content.m1s[0].b = ssbo_140.content.m1s[0].b;
+    ssbo_430.content.m2s[0].a[0] = ssbo_140.content.m2s[0].a[0];
+    ssbo_430.content.m2s[0].b = ssbo_140.content.m2s[0].b;
+    ssbo_430.content.m0.a[0] = ssbo_140.content.m0.a[0].xy;
+    ssbo_430.content.m0.b = ssbo_140.content.m0.b;
+    ssbo_430.content.m1.a = ssbo_140.content.m1.a;
+    ssbo_430.content.m1.b = ssbo_140.content.m1.b;
+    ssbo_430.content.m2.a[0] = ssbo_140.content.m2.a[0];
+    ssbo_430.content.m2.b = ssbo_140.content.m2.b;
+    ssbo_430.content.m3.a = ssbo_140.content.m3.a;
+    ssbo_430.content.m3.b = ssbo_140.content.m3.b;
+    ssbo_430.content.m4 = ssbo_140.content.m4;
+    ssbo_430.content.m3s[0].c = ssbo_140.content.m3s[0].c;
+    ssbo_430.content.m3s[1].c = ssbo_140.content.m3s[1].c;
+    ssbo_430.content.m3s[2].c = ssbo_140.content.m3s[2].c;
+    ssbo_430.content.m3s[3].c = ssbo_140.content.m3s[3].c;
+    ssbo_430.content.m3s[4].c = ssbo_140.content.m3s[4].c;
+    ssbo_430.content.m3s[5].c = ssbo_140.content.m3s[5].c;
+    ssbo_430.content.m3s[6].c = ssbo_140.content.m3s[6].c;
+    ssbo_430.content.m3s[7].c = ssbo_140.content.m3s[7].c;
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

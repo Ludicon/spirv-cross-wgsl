@@ -1,0 +1,49 @@
+enable subgroups;
+
+struct SSBO
+{
+    data : array<f32>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(64u, 1u, 1u);
+
+@group(0) @binding(0) var<storage, read_write> ssbo : SSBO;
+
+var<private> gl_GlobalInvocationID : vec3u;
+var<private> gl_SubgroupSize : u32;
+var<private> gl_SubgroupInvocationID : u32;
+
+fn comp_main()
+{
+    var _25 : f32 = ssbo.data[gl_GlobalInvocationID.x];
+    var _29 : f32 = subgroupAdd(_25);
+    var _32 : f32 = subgroupExclusiveAdd(_25);
+    var _35 : f32 = subgroupMax(_25);
+    var _38 : f32 = subgroupBroadcastFirst(_25);
+    var _42 : f32 = subgroupShuffleXor(_25, 1u);
+    var _49 : bool = _25 > 0.0f;
+    var _50 : vec4u = subgroupBallot(_49);
+    var _55 : bool = subgroupAll(_49);
+    var _56 : bool = subgroupElect();
+    if (_56)
+    {
+        ssbo.data[0] = _29;
+    }
+    ssbo.data[gl_GlobalInvocationID.x] = ((((((_32 + _35) + _38) + _42) + f32(_50.x)) + f32(gl_SubgroupSize)) + f32(gl_SubgroupInvocationID)) + select(0.0f, 1.0f, _55);
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+    @builtin(subgroup_size) gl_SubgroupSize : u32,
+    @builtin(subgroup_invocation_id) gl_SubgroupInvocationID : u32,
+}
+
+@compute @workgroup_size(64, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    gl_SubgroupSize = stage_input.gl_SubgroupSize;
+    gl_SubgroupInvocationID = stage_input.gl_SubgroupInvocationID;
+    comp_main();
+}

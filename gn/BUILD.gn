@@ -47,6 +47,8 @@ source_set("spirv_cross_sources") {
     "../spirv_parser.hpp",
     "../spirv_reflect.cpp",
     "../spirv_reflect.hpp",
+    "../spirv_wgsl.cpp",
+    "../spirv_wgsl.hpp",
   ]
 
   if (!is_win) {

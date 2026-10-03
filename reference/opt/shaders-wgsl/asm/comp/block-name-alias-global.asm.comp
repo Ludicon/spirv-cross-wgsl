@@ -1,0 +1,58 @@
+struct A
+{
+    a : i32,
+    b : i32,
+}
+
+struct A_1
+{
+    Data : array<A>,
+}
+
+struct A_2
+{
+    a : i32,
+    @size(12) b : i32,
+}
+
+struct A_3
+{
+    Data : array<A_2, 1024>,
+}
+
+struct B
+{
+    Data : array<A>,
+}
+
+struct B_1
+{
+    Data : array<A_2, 1024>,
+}
+
+@group(0) @binding(1) var<storage, read_write> C1 : A_1;
+@group(0) @binding(2) var<uniform> C2 : A_3;
+@group(0) @binding(0) var<storage, read_write> C3 : B;
+@group(0) @binding(3) var<uniform> C4 : B_1;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    C1.Data[gl_GlobalInvocationID.x].a = C2.Data[gl_GlobalInvocationID.x].a;
+    C1.Data[gl_GlobalInvocationID.x].b = C2.Data[gl_GlobalInvocationID.x].b;
+    C3.Data[gl_GlobalInvocationID.x].a = C4.Data[gl_GlobalInvocationID.x].a;
+    C3.Data[gl_GlobalInvocationID.x].b = C4.Data[gl_GlobalInvocationID.x].b;
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

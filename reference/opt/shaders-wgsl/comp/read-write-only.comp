@@ -1,0 +1,35 @@
+struct SSBO2
+{
+    data4 : vec4f,
+    data5 : vec4f,
+}
+
+struct SSBO0
+{
+    data0 : vec4f,
+    data1 : vec4f,
+}
+
+struct SSBO1
+{
+    data2 : vec4f,
+    data3 : vec4f,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(2) var<storage, read_write> _10 : SSBO2;
+@group(0) @binding(0) var<storage, read> _15 : SSBO0;
+@group(0) @binding(1) var<storage, read_write> _21 : SSBO1;
+
+fn comp_main()
+{
+    _10.data4 = _15.data0 + _21.data2;
+    _10.data5 = _15.data1 + _21.data3;
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

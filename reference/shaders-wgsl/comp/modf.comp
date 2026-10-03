@@ -1,0 +1,44 @@
+struct SSBO
+{
+    in_data : array<vec4f>,
+}
+
+struct ResType
+{
+    _m0 : vec4f,
+    _m1 : vec4f,
+}
+
+struct SSBO2
+{
+    out_data : array<vec4f>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read> _23 : SSBO;
+@group(0) @binding(1) var<storage, read_write> _38 : SSBO2;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    var ident : u32 = gl_GlobalInvocationID.x;
+    let _32_modf = modf(_23.in_data[ident]);
+    var _32 : ResType = ResType(_32_modf.fract, _32_modf.whole);
+    var i : vec4f = _32._m1;
+    var v : vec4f = _32._m0;
+    _38.out_data[ident] = v;
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

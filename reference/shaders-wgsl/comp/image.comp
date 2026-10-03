@@ -1,0 +1,25 @@
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var uImageIn : texture_storage_2d<rgba8unorm, read>;
+@group(0) @binding(1) var uImageOut : texture_storage_2d<rgba8unorm, write>;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    var _27 : vec4f = textureLoad(uImageIn, (bitcast<vec2i>(gl_GlobalInvocationID.xy) + vec2i(textureDimensions(uImageIn))));
+    var v : vec4f = _27;
+    textureStore(uImageOut, bitcast<vec2i>(gl_GlobalInvocationID.xy), v);
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

@@ -1,0 +1,24 @@
+struct Buf_count
+{
+    _count : atomic<i32>,
+}
+
+struct Buf
+{
+    _data : array<vec4f>,
+}
+
+@group(0) @binding(1) var<storage, read_write> Buf_count_1 : Buf_count;
+@group(0) @binding(0) var<storage, read_write> Buf_1 : Buf;
+
+fn comp_main()
+{
+    var _33 : i32 = atomicAdd(&Buf_count_1._count, 1);
+    Buf_1._data[_33] = vec4f(1.0f);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

@@ -1,0 +1,44 @@
+struct bar
+{
+    _data : array<vec4f>,
+}
+
+@group(0) @binding(0) var<storage, read_write> bar_1 : bar;
+@group(0) @binding(1) var<storage, read_write> foo : bar;
+
+fn comp_main()
+{
+    bar_1._data[0] = foo._data[0];
+    bar_1._data[1] = foo._data[1];
+    bar_1._data[2] = foo._data[2];
+    bar_1._data[3] = foo._data[3];
+    bar_1._data[4] = foo._data[4];
+    bar_1._data[5] = foo._data[5];
+    bar_1._data[6] = foo._data[6];
+    bar_1._data[7] = foo._data[7];
+    bar_1._data[8] = foo._data[8];
+    bar_1._data[9] = foo._data[9];
+    bar_1._data[10] = foo._data[10];
+    bar_1._data[11] = foo._data[11];
+    bar_1._data[12] = foo._data[12];
+    bar_1._data[13] = foo._data[13];
+    bar_1._data[14] = foo._data[14];
+    bar_1._data[15] = foo._data[15];
+    for (var _137 : i32 = 0; _137 < 16; )
+    {
+        bar_1._data[15 - _137] = foo._data[_137];
+        _137++;
+        continue;
+    }
+    if (bar_1._data[10].x > 10.0f)
+    {
+        foo._data[20] = vec4f(5.0f);
+    }
+    foo._data[20] = vec4f(20.0f);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

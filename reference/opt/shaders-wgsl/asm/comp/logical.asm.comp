@@ -1,0 +1,9 @@
+fn comp_main()
+{
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

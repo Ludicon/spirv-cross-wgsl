@@ -1,0 +1,22 @@
+#version 450
+layout(local_size_x = 1) in;
+
+layout(std430, binding = 0) buffer SSBO
+{
+	ivec4 i;
+	uvec4 u;
+	int shift;
+	uint ushift;
+} ssbo;
+
+void main()
+{
+	ivec4 a = ssbo.i;
+	uvec4 b = ssbo.u;
+	ssbo.i = (a << ssbo.shift) + (a >> ivec4(ssbo.ushift)) + ivec4(b >> 3u);
+	ssbo.u = (b << uvec4(2u)) ^ (b >> ssbo.shift);
+	ssbo.i += bitfieldExtract(a, 1, 4) + findLSB(a) + findMSB(b) + bitCount(b);
+	ssbo.u += bitfieldInsert(b, uvec4(7u), 4, 3) + bitfieldReverse(b) + uvec4(bitfieldExtract(b, ssbo.shift, 2));
+	ssbo.u.x += packUnorm4x8(vec4(0.5)) + packHalf2x16(vec2(1.0, 2.0));
+	ssbo.i.x += floatBitsToInt(unpackSnorm2x16(ssbo.u.y).x);
+}

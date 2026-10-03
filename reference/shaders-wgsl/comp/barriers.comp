@@ -1,0 +1,81 @@
+const gl_WorkGroupSize : vec3u = vec3u(4u, 1u, 1u);
+
+fn barrier_shared()
+{
+    workgroupBarrier();
+}
+
+fn full_barrier()
+{
+    storageBarrier();
+    textureBarrier();
+    workgroupBarrier();
+}
+
+fn image_barrier()
+{
+    textureBarrier();
+}
+
+fn buffer_barrier()
+{
+    storageBarrier();
+}
+
+fn group_barrier()
+{
+    storageBarrier();
+    textureBarrier();
+    workgroupBarrier();
+}
+
+fn barrier_shared_exec()
+{
+    workgroupBarrier();
+}
+
+fn full_barrier_exec()
+{
+    workgroupBarrier();
+}
+
+fn image_barrier_exec()
+{
+    workgroupBarrier();
+}
+
+fn buffer_barrier_exec()
+{
+    workgroupBarrier();
+}
+
+fn group_barrier_exec()
+{
+    workgroupBarrier();
+}
+
+fn exec_barrier()
+{
+    workgroupBarrier();
+}
+
+fn comp_main()
+{
+    barrier_shared();
+    full_barrier();
+    image_barrier();
+    buffer_barrier();
+    group_barrier();
+    barrier_shared_exec();
+    full_barrier_exec();
+    image_barrier_exec();
+    buffer_barrier_exec();
+    group_barrier_exec();
+    exec_barrier();
+}
+
+@compute @workgroup_size(4, 1, 1)
+fn main()
+{
+    comp_main();
+}

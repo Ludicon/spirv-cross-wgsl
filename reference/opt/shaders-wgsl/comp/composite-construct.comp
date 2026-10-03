@@ -1,0 +1,33 @@
+struct SSBO0
+{
+    _as : array<vec4f>,
+}
+
+struct SSBO1
+{
+    bs : array<vec4f>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read_write> _41 : SSBO0;
+@group(0) @binding(1) var<storage, read_write> _55 : SSBO1;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    _41._as[gl_GlobalInvocationID.x] = ((_41._as[gl_GlobalInvocationID.x] + _55.bs[gl_GlobalInvocationID.x]) + _55.bs[gl_GlobalInvocationID.x]) + vec4f(10.0f);
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

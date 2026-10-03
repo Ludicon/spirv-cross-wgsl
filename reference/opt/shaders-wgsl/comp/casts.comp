@@ -1,0 +1,33 @@
+struct SSBO1
+{
+    outputs : array<vec4i>,
+}
+
+struct SSBO0
+{
+    inputs : array<vec4i>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(1) var<storage, read_write> _21 : SSBO1;
+@group(0) @binding(0) var<storage, read_write> _27 : SSBO0;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    _21.outputs[gl_GlobalInvocationID.x] = select(vec4i(0), vec4i(1), (_27.inputs[gl_GlobalInvocationID.x] & vec4i(3)) != bitcast<vec4i>(vec4u(0u)));
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

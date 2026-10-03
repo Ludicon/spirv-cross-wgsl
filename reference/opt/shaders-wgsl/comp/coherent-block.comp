@@ -1,0 +1,19 @@
+struct SSBO
+{
+    value : vec4f,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(1) var<storage, read_write> _10 : SSBO;
+
+fn comp_main()
+{
+    _10.value = vec4f(20.0f);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

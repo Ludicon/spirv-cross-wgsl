@@ -1,0 +1,21 @@
+struct SSBO
+{
+    value : vec4i,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(1) var<storage, read_write> _10 : SSBO;
+@group(0) @binding(3) var uImage : texture_storage_2d<r32sint, read>;
+
+fn comp_main()
+{
+    var _19 : vec4i = textureLoad(uImage, vec2i(10));
+    _10.value = _19;
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

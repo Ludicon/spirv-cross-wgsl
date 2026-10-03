@@ -33,12 +33,13 @@ import platform
 from functools import partial
 
 class Paths():
-    def __init__(self, spirv_cross, glslang, spirv_as, spirv_val, spirv_opt):
+    def __init__(self, spirv_cross, glslang, spirv_as, spirv_val, spirv_opt, tint = 'tint'):
         self.spirv_cross = spirv_cross
         self.glslang = glslang
         self.spirv_as = spirv_as
         self.spirv_val = spirv_val
         self.spirv_opt = spirv_opt
+        self.tint = tint
 
 def remove_file(path):
     #print('Removing file:', path)
@@ -612,6 +613,53 @@ def cross_compile_hlsl(shader, spirv, opt, force_no_external_validation, iterati
 
     return (spirv_path, hlsl_path)
 
+def validate_shader_wgsl(shader, force_no_external_validation, paths):
+    if force_no_external_validation or not shutil.which(paths.tint):
+        return
+    output_path = create_temporary('validated.wgsl')
+    try:
+        subprocess.check_call([paths.tint, '--input-format', 'wgsl', '--format', 'wgsl', '-o', output_path, shader])
+    except subprocess.CalledProcessError:
+        print('Failed compiling WGSL shader:', shader, 'with tint.')
+        raise RuntimeError('Failed to validate WGSL shader')
+    finally:
+        remove_file(output_path)
+
+def cross_compile_wgsl(shader, spirv, opt, force_no_external_validation, iterations, paths):
+    spirv_path = create_temporary()
+    wgsl_path = create_temporary(os.path.basename(shader))
+
+    spirv_16 = '.spv16.' in shader
+    spirv_14 = '.spv14.' in shader
+
+    if spirv_16:
+        spirv_env = 'spv1.6'
+        glslang_env = 'vulkan1.3'
+    elif spirv_14:
+        spirv_env = 'vulkan1.1spv1.4'
+        glslang_env = 'spirv1.4'
+    else:
+        spirv_env = 'vulkan1.1'
+        glslang_env = 'vulkan1.1'
+
+    if spirv:
+        subprocess.check_call([paths.spirv_as, '--preserve-numeric-ids', '--target-env', spirv_env, '-o', spirv_path, shader])
+    else:
+        subprocess.check_call([paths.glslang, '--amb', '--target-env', glslang_env, '-V', '-o', spirv_path, shader])
+
+    if opt and (not shader_is_invalid_spirv(wgsl_path)):
+        subprocess.check_call([paths.spirv_opt, '--skip-validation', '-O', '-o', spirv_path, spirv_path])
+
+    wgsl_args = [paths.spirv_cross, '--entry', 'main', '--output', wgsl_path, spirv_path, '--wgsl', '--iterations', str(iterations)]
+    subprocess.check_call(wgsl_args)
+
+    if not shader_is_invalid_spirv(wgsl_path):
+        subprocess.check_call([paths.spirv_val, '--allow-localsizeid', '--scalar-block-layout', '--target-env', spirv_env, spirv_path])
+
+    validate_shader_wgsl(wgsl_path, force_no_external_validation, paths)
+
+    return (spirv_path, wgsl_path)
+
 def cross_compile_reflect(shader, spirv, opt, iterations, paths):
     spirv_path = create_temporary()
     reflect_path = create_temporary(os.path.basename(shader))
@@ -1012,6 +1060,15 @@ def test_shader_hlsl(stats, shader, args, paths):
     regression_check(shader, hlsl, args)
     remove_file(spirv)
 
+def test_shader_wgsl(stats, shader, args, paths):
+    joined_path = os.path.join(shader[0], shader[1])
+    print('Testing WGSL shader:', joined_path)
+    is_spirv = shader_is_spirv(shader[1])
+    noopt = shader_is_noopt(shader[1])
+    spirv, wgsl = cross_compile_wgsl(joined_path, is_spirv, args.opt and (not noopt), args.force_no_external_validation, args.iterations, paths)
+    regression_check(shader, wgsl, args)
+    remove_file(spirv)
+
 def test_shader_reflect(stats, shader, args, paths):
     joined_path = os.path.join(shader[0], shader[1])
     print('Testing shader reflection:', joined_path)
@@ -1022,12 +1079,14 @@ def test_shader_reflect(stats, shader, args, paths):
     remove_file(spirv)
 
 def test_shader_file(relpath, stats, args, backend):
-    paths = Paths(args.spirv_cross, args.glslang, args.spirv_as, args.spirv_val, args.spirv_opt)
+    paths = Paths(args.spirv_cross, args.glslang, args.spirv_as, args.spirv_val, args.spirv_opt, args.tint)
     try:
         if backend == 'msl':
             test_shader_msl(stats, (args.folder, relpath), args, paths)
         elif backend == 'hlsl':
             test_shader_hlsl(stats, (args.folder, relpath), args, paths)
+        elif backend == 'wgsl':
+            test_shader_wgsl(stats, (args.folder, relpath), args, paths)
         elif backend == 'reflect':
             test_shader_reflect(stats, (args.folder, relpath), args, paths)
         else:
@@ -1103,6 +1162,9 @@ def main():
     parser.add_argument('--hlsl',
             action = 'store_true',
             help = 'Test HLSL backend.')
+    parser.add_argument('--wgsl',
+            action = 'store_true',
+            help = 'Test WGSL backend. Output is validated with tint if it is found.')
     parser.add_argument('--force-no-external-validation',
             action = 'store_true',
             help = 'Disable all external validation.')
@@ -1130,6 +1192,9 @@ def main():
     parser.add_argument('--spirv-opt',
             default = 'spirv-opt',
             help = 'Explicit path to spirv-opt')
+    parser.add_argument('--tint',
+            default = 'tint',
+            help = 'Explicit path to tint, used to validate WGSL output')
     parser.add_argument('--iterations',
             default = 1,
             type = int,
@@ -1152,6 +1217,8 @@ def main():
         backend = 'msl'
     elif args.hlsl:
         backend = 'hlsl'
+    elif args.wgsl:
+        backend = 'wgsl'
     elif args.reflect:
         backend = 'reflect'
 

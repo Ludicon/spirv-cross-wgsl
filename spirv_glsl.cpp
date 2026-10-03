@@ -5661,6 +5661,14 @@ string CompilerGLSL::address_of_expression(const std::string &expr)
 }
 
 // Just like to_expression except that we enclose the expression inside parentheses if needed.
+string CompilerGLSL::to_condition_expression(uint32_t id)
+{
+	auto expr = to_expression(id);
+	if (backend.strip_condition_parentheses)
+		strip_enclosed_expression(expr);
+	return expr;
+}
+
 string CompilerGLSL::to_enclosed_expression(uint32_t id, bool register_expression_read)
 {
 	return enclose_expression(to_expression(id, register_expression_read));
@@ -6764,6 +6772,13 @@ string CompilerGLSL::convert_float_to_string(const SPIRConstant &c, uint32_t col
 	return res;
 }
 
+std::string CompilerGLSL::int32_to_string(int32_t value) const
+{
+	if (value == (std::numeric_limits<int32_t>::min)())
+		return backend.int32_min_literal;
+	return convert_to_string(value);
+}
+
 std::string CompilerGLSL::convert_double_to_string(const SPIRConstant &c, uint32_t col, uint32_t row)
 {
 	string res;
@@ -7111,7 +7126,7 @@ string CompilerGLSL::constant_expression_vector(const SPIRConstant &c, uint32_t 
 
 	case SPIRType::Int:
 		if (splat)
-			res += convert_to_string(c.scalar_i32(vector, 0));
+			res += int32_to_string(c.scalar_i32(vector, 0));
 		else
 		{
 			for (uint32_t i = 0; i < c.vector_size(); i++)
@@ -7119,7 +7134,7 @@ string CompilerGLSL::constant_expression_vector(const SPIRConstant &c, uint32_t 
 				if (c.vector_size() > 1 && c.specialization_constant_id(vector, i) != 0)
 					res += to_expression(c.specialization_constant_id(vector, i));
 				else
-					res += convert_to_string(c.scalar_i32(vector, i));
+					res += int32_to_string(c.scalar_i32(vector, i));
 				if (i + 1 < c.vector_size())
 					res += ", ";
 			}
@@ -8636,6 +8651,7 @@ std::string CompilerGLSL::to_texture_op(const Instruction &i, bool sparse, bool 
 	name_args.has_dref = dref != 0;
 	name_args.is_sparse_feedback = sparse;
 	name_args.has_min_lod = minlod != 0;
+	name_args.has_bias = bias != 0;
 	name_args.lod = lod;
 	expr += to_function_name(name_args);
 	expr += "(";
@@ -18548,7 +18564,7 @@ void CompilerGLSL::branch(BlockID from, uint32_t cond, BlockID true_block, Block
 
 	if (true_block_needs_code)
 	{
-		statement("if (", to_expression(cond), ")");
+		statement("if (", to_condition_expression(cond), ")");
 		begin_scope();
 		branch(from, true_block);
 		end_scope();
@@ -18619,6 +18635,7 @@ string CompilerGLSL::emit_continue_block(uint32_t continue_block, bool follow_tr
 
 	// Restore old pointer.
 	redirect_statement = old;
+	continue_block_statement_count = uint32_t(statements.size());
 
 	// Somewhat ugly, strip off the last ';' since we use ',' instead.
 	// Ideally, we should select this behavior in statement().
@@ -18689,7 +18706,8 @@ string CompilerGLSL::emit_for_loop_initializers(const SPIRBlock &block)
 	{
 		return variable_decl(get<SPIRVariable>(block.loop_variables.front()));
 	}
-	else if (!same_types || missing_initializers == uint32_t(block.loop_variables.size()))
+	else if (!same_types || missing_initializers == uint32_t(block.loop_variables.size()) ||
+	         (!backend.support_complex_for_loop && block.loop_variables.size() - missing_initializers > 1))
 	{
 		for (auto &loop_var : block.loop_variables)
 		{
@@ -18808,7 +18826,7 @@ bool CompilerGLSL::attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method 
 				// Important that we do this in this order because
 				// emitting the continue block can invalidate the condition expression.
 				auto initializer = emit_for_loop_initializers(block);
-				auto condition = to_expression(block.condition);
+				auto condition = to_condition_expression(block.condition);
 
 				// Condition might have to be inverted.
 				if (execution_is_noop(get<SPIRBlock>(block.true_block), get<SPIRBlock>(block.merge_block)))
@@ -18818,6 +18836,13 @@ bool CompilerGLSL::attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method 
 				if (method != SPIRBlock::MergeToSelectContinueForLoop)
 				{
 					auto continue_block = emit_continue_block(block.continue_block, false, false);
+					if (!backend.support_complex_for_loop && continue_block_statement_count > 1)
+					{
+						block.disable_block_optimization = true;
+						force_recompile();
+						begin_scope(); // We'll see an end_scope() later.
+						return false;
+					}
 					statement("for (", initializer, "; ", condition, "; ", continue_block, ")");
 				}
 				else
@@ -18832,7 +18857,7 @@ bool CompilerGLSL::attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method 
 				emit_while_loop_initializers(block);
 				emit_block_hints(block);
 
-				auto condition = to_expression(block.condition);
+				auto condition = to_condition_expression(block.condition);
 				// Condition might have to be inverted.
 				if (execution_is_noop(get<SPIRBlock>(block.true_block), get<SPIRBlock>(block.merge_block)))
 					condition = join("!", enclose_expression(condition));
@@ -18893,7 +18918,7 @@ bool CompilerGLSL::attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method 
 				// Important that we do this in this order because
 				// emitting the continue block can invalidate the condition expression.
 				auto initializer = emit_for_loop_initializers(block);
-				auto condition = to_expression(child.condition);
+				auto condition = to_condition_expression(child.condition);
 
 				// Condition might have to be inverted.
 				if (execution_is_noop(get<SPIRBlock>(child.true_block), get<SPIRBlock>(block.merge_block)))
@@ -18903,6 +18928,13 @@ bool CompilerGLSL::attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method 
 				}
 
 				auto continue_block = emit_continue_block(block.continue_block, false, false);
+				if (!backend.support_complex_for_loop && continue_block_statement_count > 1)
+				{
+					block.disable_block_optimization = true;
+					force_recompile();
+					begin_scope(); // We'll see an end_scope() later.
+					return false;
+				}
 				emit_block_hints(block);
 				statement("for (", initializer, "; ", condition, "; ", continue_block, ")");
 				break;
@@ -18913,7 +18945,7 @@ bool CompilerGLSL::attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method 
 				emit_while_loop_initializers(block);
 				emit_block_hints(block);
 
-				auto condition = to_expression(child.condition);
+				auto condition = to_condition_expression(child.condition);
 				// Condition might have to be inverted.
 				if (execution_is_noop(get<SPIRBlock>(child.true_block), get<SPIRBlock>(block.merge_block)))
 				{
@@ -19142,7 +19174,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 		// for (;;) { create-temporary; break; } consume-temporary;
 		// so force-declare temporaries here.
 		emit_hoisted_temporaries(block.potential_declare_temporary);
-		statement("do");
+		statement(backend.support_do_while ? "do" : backend.infinite_loop_header);
 		begin_scope();
 
 		emit_block_instructions(block);
@@ -19163,7 +19195,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 		// so force-declare temporaries here.
 		emit_hoisted_temporaries(block.potential_declare_temporary);
 		emit_block_hints(block);
-		statement("for (;;)");
+		statement(backend.infinite_loop_header);
 		begin_scope();
 
 		emit_block_instructions(block);
@@ -19274,7 +19306,11 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 		current_emitting_switch_stack.push_back(&block);
 
 		if (block.need_ladder_break)
-			statement("bool _", block.self, "_ladder_break = false;");
+		{
+			SPIRType bool_type { OpTypeBool };
+			bool_type.basetype = SPIRType::Boolean;
+			statement(variable_decl(bool_type, join("_", block.self, "_ladder_break")), " = false;");
+		}
 
 		// Find all unique case constructs.
 		unordered_map<uint32_t, SmallVector<uint64_t>> case_constructs;
@@ -19445,8 +19481,15 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 					statement("for (int spvDummy", counter, " = 0; spvDummy", counter, " < 1; spvDummy", counter,
 					          "++)");
 				}
-				else
+				else if (backend.support_do_while)
 					statement("do");
+				else
+				{
+					// Emulate do { } while(false) with a switch with only a default label.
+					statement("switch (0)");
+					begin_scope();
+					statement("default:");
+				}
 			}
 			else
 			{
@@ -19455,6 +19498,8 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 			}
 			begin_scope();
 		}
+
+		bool emitted_default_label = false;
 
 		for (size_t i = 0; i < num_blocks; i++)
 		{
@@ -19470,6 +19515,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 						statement("else");
 					else
 						statement("default:");
+					emitted_default_label = true;
 				}
 			}
 			else
@@ -19478,6 +19524,13 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 				{
 					statement((i ? "else " : ""), "if (", to_legacy_case_label(block.condition, literals, label_suffix),
 					          ")");
+				}
+				else if (backend.merge_case_labels)
+				{
+					SmallVector<string> labels;
+					for (auto &case_literal : literals)
+						labels.push_back(join(to_case_label(case_literal, type.width, unsigned_case), label_suffix));
+					statement("case ", merge(labels), ":");
 				}
 				else
 				{
@@ -19521,15 +19574,31 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 		bool need_fallthrough_block = block.default_block == block.next_block || !literals_to_merge.empty();
 		if (!collapsed_switch && ((header_merge_requires_phi && need_fallthrough_block) || !literals_to_merge.empty()))
 		{
-			for (auto &case_literal : literals_to_merge)
-				statement("case ", to_case_label(case_literal, type.width, unsigned_case), label_suffix, ":");
-
-			if (block.default_block == block.next_block)
+			if (backend.merge_case_labels)
 			{
-				if (is_legacy())
-					statement("else");
-				else
-					statement("default:");
+				SmallVector<string> labels;
+				for (auto &case_literal : literals_to_merge)
+					labels.push_back(join(to_case_label(case_literal, type.width, unsigned_case), label_suffix));
+				if (block.default_block == block.next_block)
+				{
+					labels.push_back("default");
+					emitted_default_label = true;
+				}
+				statement("case ", merge(labels), ":");
+			}
+			else
+			{
+				for (auto &case_literal : literals_to_merge)
+					statement("case ", to_case_label(case_literal, type.width, unsigned_case), label_suffix, ":");
+
+				if (block.default_block == block.next_block)
+				{
+					if (is_legacy())
+						statement("else");
+					else
+						statement("default:");
+					emitted_default_label = true;
+				}
 			}
 
 			begin_scope();
@@ -19538,10 +19607,27 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 			end_scope();
 		}
 
+		if (!collapsed_switch && !block_like_switch && !is_legacy() && backend.switch_requires_default &&
+		    !emitted_default_label)
+		{
+			statement("default:");
+			begin_scope();
+			statement("break;");
+			end_scope();
+		}
+
 		if (!collapsed_switch)
 		{
 			if ((block_like_switch || is_legacy()) && !is_legacy_es())
-				end_scope_decl("while(false)");
+			{
+				if (block_like_switch && !is_legacy() && !backend.support_do_while)
+				{
+					end_scope();
+					end_scope();
+				}
+				else
+					end_scope_decl("while(false)");
+			}
 			else
 				end_scope();
 		}
@@ -19781,7 +19867,16 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 			if (!positive_test)
 				condition = join("!", enclose_expression(condition));
 
-			end_scope_decl(join("while (", condition, ")"));
+			if (backend.support_do_while)
+				end_scope_decl(join("while (", condition, ")"));
+			else
+			{
+				statement("continuing");
+				begin_scope();
+				statement("break if !", enclose_expression(condition), ";");
+				end_scope();
+				end_scope();
+			}
 		}
 		else
 			end_scope();

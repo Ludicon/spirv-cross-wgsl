@@ -1,0 +1,26 @@
+const gl_WorkGroupSize : vec3u = vec3u(4u, 1u, 1u);
+
+fn comp_main()
+{
+    workgroupBarrier();
+    storageBarrier();
+    textureBarrier();
+    workgroupBarrier();
+    textureBarrier();
+    storageBarrier();
+    storageBarrier();
+    textureBarrier();
+    workgroupBarrier();
+    workgroupBarrier();
+    workgroupBarrier();
+    workgroupBarrier();
+    workgroupBarrier();
+    workgroupBarrier();
+    workgroupBarrier();
+}
+
+@compute @workgroup_size(4, 1, 1)
+fn main()
+{
+    comp_main();
+}

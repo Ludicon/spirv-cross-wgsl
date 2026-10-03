@@ -1,0 +1,28 @@
+#version 450
+#extension GL_KHR_shader_subgroup_basic : require
+#extension GL_KHR_shader_subgroup_ballot : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_KHR_shader_subgroup_shuffle : require
+#extension GL_KHR_shader_subgroup_vote : require
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) buffer SSBO
+{
+	float data[];
+} ssbo;
+
+void main()
+{
+	float v = ssbo.data[gl_GlobalInvocationID.x];
+	float sum = subgroupAdd(v);
+	float prefix = subgroupExclusiveAdd(v);
+	float m = subgroupMax(v);
+	float first = subgroupBroadcastFirst(v);
+	float shuffled = subgroupShuffleXor(v, 1u);
+	uvec4 ballot = subgroupBallot(v > 0.0);
+	bool all_positive = subgroupAll(v > 0.0);
+	if (subgroupElect())
+		ssbo.data[0] = sum;
+	ssbo.data[gl_GlobalInvocationID.x] = prefix + m + first + shuffled + float(ballot.x) + float(gl_SubgroupSize) +
+	                                     float(gl_SubgroupInvocationID) + (all_positive ? 1.0 : 0.0);
+}

@@ -1,0 +1,47 @@
+struct _3
+{
+    _m0 : array<f32>,
+}
+
+@group(0) @binding(0) var<storage, read_write> _4 : _3;
+@group(0) @binding(1) var<storage, read_write> _5 : _3;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    var _34 : bool;
+    var _35 : f32;
+    var _35_copy : f32;
+    var _36 : f32;
+    _34 = true;
+    _35 = _4._m0[gl_GlobalInvocationID.x];
+    _36 = 8.5f;
+    loop
+    {
+        if (_34)
+        {
+            _34 = false;
+            _35_copy = _35;
+            _35 = _36;
+            _36 = _35_copy;
+        }
+        else
+        {
+            break;
+        }
+    }
+    _5._m0[gl_GlobalInvocationID.x] = _35 - _36;
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

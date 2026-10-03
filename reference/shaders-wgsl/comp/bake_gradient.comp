@@ -1,0 +1,54 @@
+struct UBO
+{
+    uInvSize : vec4f,
+    uScale : vec4f,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(8u, 8u, 1u);
+
+@group(0) @binding(4) var<uniform> _46 : UBO;
+@group(0) @binding(0) var uHeight : texture_2d<f32>;
+@group(0) @binding(16) var uHeight_sampler : sampler;
+@group(0) @binding(1) var uDisplacement : texture_2d<f32>;
+@group(0) @binding(17) var uDisplacement_sampler : sampler;
+@group(0) @binding(2) var iHeightDisplacement : texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var iGradJacobian : texture_storage_2d<rgba16float, write>;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn jacobian(dDdx : vec2f, dDdy : vec2f) -> f32
+{
+    return ((1.0f + dDdx.x) * (1.0f + dDdy.y)) - (dDdx.y * dDdy.x);
+}
+
+fn comp_main()
+{
+    var uv : vec4f = (vec2f(gl_GlobalInvocationID.xy) * _46.uInvSize.xy).xyxy + (_46.uInvSize * 0.5f);
+    var h : f32 = textureSampleLevel(uHeight, uHeight_sampler, uv.xy, 0.0f).x;
+    var x0 : f32 = textureSampleLevel(uHeight, uHeight_sampler, uv.xy, 0.0f, vec2i(-1, 0)).x;
+    var x1 : f32 = textureSampleLevel(uHeight, uHeight_sampler, uv.xy, 0.0f, vec2i(1, 0)).x;
+    var y0 : f32 = textureSampleLevel(uHeight, uHeight_sampler, uv.xy, 0.0f, vec2i(0, -1)).x;
+    var y1 : f32 = textureSampleLevel(uHeight, uHeight_sampler, uv.xy, 0.0f, vec2i(0, 1)).x;
+    var grad : vec2f = (_46.uScale.xy * 0.5f) * vec2f(x1 - x0, y1 - y0);
+    var displacement : vec2f = textureSampleLevel(uDisplacement, uDisplacement_sampler, uv.zw, 0.0f).xy * 1.2000000476837158203125f;
+    var dDdx : vec2f = (textureSampleLevel(uDisplacement, uDisplacement_sampler, uv.zw, 0.0f, vec2i(1, 0)).xy - textureSampleLevel(uDisplacement, uDisplacement_sampler, uv.zw, 0.0f, vec2i(-1, 0)).xy) * 0.60000002384185791015625f;
+    var dDdy : vec2f = (textureSampleLevel(uDisplacement, uDisplacement_sampler, uv.zw, 0.0f, vec2i(0, 1)).xy - textureSampleLevel(uDisplacement, uDisplacement_sampler, uv.zw, 0.0f, vec2i(0, -1)).xy) * 0.60000002384185791015625f;
+    var param : vec2f = dDdx * _46.uScale.z;
+    var param_1 : vec2f = dDdy * _46.uScale.z;
+    var j : f32 = jacobian(param, param_1);
+    displacement = vec2f(0.0f);
+    textureStore(iHeightDisplacement, bitcast<vec2i>(gl_GlobalInvocationID.xy), vec4f(h, displacement, 0.0f));
+    textureStore(iGradJacobian, bitcast<vec2i>(gl_GlobalInvocationID.xy), vec4f(grad, j, 0.0f));
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

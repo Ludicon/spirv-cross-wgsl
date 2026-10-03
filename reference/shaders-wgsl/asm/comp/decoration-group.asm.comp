@@ -1,0 +1,55 @@
+struct _6
+{
+    _m0 : array<f32>,
+}
+
+struct _7
+{
+    _m0 : array<f32>,
+}
+
+struct _8
+{
+    _m0 : array<f32>,
+}
+
+struct _9
+{
+    _m0 : array<f32>,
+}
+
+struct _10
+{
+    _m0 : array<f32>,
+}
+
+struct _11
+{
+    _m0 : array<f32>,
+}
+
+@group(0) @binding(5) var<storage, read_write> _15 : _6;
+@group(0) @binding(0) var<storage, read_write> _16 : _7;
+@group(0) @binding(1) var<storage, read_write> _17 : _8;
+@group(0) @binding(2) var<storage, read> _18 : _9;
+@group(0) @binding(3) var<storage, read> _19 : _10;
+@group(0) @binding(4) var<storage, read> _20 : _11;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    _15._m0[gl_GlobalInvocationID.x] = (((_16._m0[gl_GlobalInvocationID.x] + _17._m0[gl_GlobalInvocationID.x]) + _18._m0[gl_GlobalInvocationID.x]) + _19._m0[gl_GlobalInvocationID.x]) + _20._m0[gl_GlobalInvocationID.x];
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

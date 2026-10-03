@@ -1,0 +1,60 @@
+struct SSBO0
+{
+    a : f32,
+    b : vec2f,
+    c : vec3f,
+    d : vec4f,
+}
+
+struct SSBO1
+{
+    a : f32,
+    b : vec2f,
+    c : vec3f,
+    d : vec4f,
+}
+
+@group(0) @binding(0) var<storage, read_write> s0 : SSBO0;
+@group(0) @binding(1) var<storage, read_write> s1 : SSBO1;
+
+fn and(a : bool, b : bool) -> bool
+{
+    return !((a && b) || b);
+}
+
+fn and_9(a : vec2<bool>, b : vec2<bool>) -> vec2<bool>
+{
+    return !((a & b) | b);
+}
+
+fn and_13(a : vec3<bool>, b : vec3<bool>) -> vec3<bool>
+{
+    return a & b;
+}
+
+fn and_17(a : vec4<bool>, b : vec4<bool>) -> vec4<bool>
+{
+    return a & b;
+}
+
+fn comp_main()
+{
+    var param : bool = (bitcast<u32>(s0.a) & 0x7fffffffu) == 0x7f800000u;
+    var param_1 : bool = (bitcast<u32>(s1.a) & 0x7fffffffu) > 0x7f800000u;
+    var b0 : bool = and(param, param_1);
+    var param_2 : vec2<bool> = (bitcast<vec2u>(s0.b) & vec2u(0x7fffffffu)) == vec2u(0x7f800000u);
+    var param_3 : vec2<bool> = (bitcast<vec2u>(s1.b) & vec2u(0x7fffffffu)) > vec2u(0x7f800000u);
+    var b1 : vec2<bool> = and_9(param_2, param_3);
+    var param_4 : vec3<bool> = (bitcast<vec3u>(s0.c) & vec3u(0x7fffffffu)) == vec3u(0x7f800000u);
+    var param_5 : vec3<bool> = (bitcast<vec3u>(s1.c) & vec3u(0x7fffffffu)) > vec3u(0x7f800000u);
+    var b2 : vec3<bool> = and_13(param_4, param_5);
+    var param_6 : vec4<bool> = (bitcast<vec4u>(s0.d) & vec4u(0x7fffffffu)) == vec4u(0x7f800000u);
+    var param_7 : vec4<bool> = (bitcast<vec4u>(s1.d) & vec4u(0x7fffffffu)) > vec4u(0x7f800000u);
+    var b3 : vec4<bool> = and_17(param_6, param_7);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

@@ -1,0 +1,45 @@
+struct SSBO
+{
+    in_data : array<vec4f>,
+}
+
+struct SSBO2
+{
+    out_data : array<vec4f>,
+}
+
+struct SSBO3
+{
+    counter : atomic<u32>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read> _23 : SSBO;
+@group(0) @binding(1) var<storage, read_write> _45 : SSBO2;
+@group(0) @binding(2) var<storage, read_write> _48 : SSBO3;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    var ident : u32 = gl_GlobalInvocationID.x;
+    var idata : vec4f = _23.in_data[ident];
+    if (dot(idata, vec4f(1.0f, 5.0f, 6.0f, 2.0f)) > 8.19999980926513671875f)
+    {
+        var _52 : u32 = atomicAdd(&_48.counter, 1u);
+        _45.out_data[_52] = idata;
+    }
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

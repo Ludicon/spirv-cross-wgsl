@@ -1,0 +1,32 @@
+const _21 : array<u32, 8> = array<u32, 8>(1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u);
+
+struct SSBO
+{
+    data : array<u32>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(8u, 8u, 1u);
+
+@group(0) @binding(0) var<storage, read_write> _14 : SSBO;
+
+var<private> gl_LocalInvocationID : vec3u;
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    _14.data[gl_GlobalInvocationID.x] = _21[gl_LocalInvocationID.x] + _21[_21[gl_LocalInvocationID.y]];
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(local_invocation_id) gl_LocalInvocationID : vec3u,
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_LocalInvocationID = stage_input.gl_LocalInvocationID;
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

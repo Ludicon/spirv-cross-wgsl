@@ -1,0 +1,26 @@
+struct SSBO
+{
+    data : vec4f,
+    index : i32,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read_write> _13 : SSBO;
+
+fn comp_main()
+{
+    var _17 : vec4f = _13.data;
+    var _28 : vec2f = _17.yz + vec2f(10.0f);
+    _13.data = vec4f(_17.x, _28, _17.w);
+    _13.data = (_17 + _17) + _17;
+    _13.data = _28.xxyy;
+    _13.data = vec4f(_28.y);
+    _13.data = vec4f((_17.zw + vec2f(10.0f))[_13.index]);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

@@ -1,0 +1,25 @@
+struct SSBO
+{
+    a : f32,
+    b : f32,
+    c : f32,
+    d : f32,
+    e : f32,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read_write> _9 : SSBO;
+
+fn comp_main()
+{
+    _9.c = distance(_9.a, _9.b);
+    _9.d = length(_9.a);
+    _9.e = sign(_9.a);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}

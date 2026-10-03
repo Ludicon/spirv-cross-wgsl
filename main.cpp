@@ -25,6 +25,7 @@
 #include "spirv_cross_util.hpp"
 #include "spirv_glsl.hpp"
 #include "spirv_hlsl.hpp"
+#include "spirv_wgsl.hpp"
 #include "spirv_msl.hpp"
 #include "spirv_parser.hpp"
 #include "spirv_reflect.hpp"
@@ -736,6 +737,11 @@ struct CLIArguments
 	string reflect;
 	bool msl = false;
 	bool hlsl = false;
+	bool wgsl = false;
+	uint32_t wgsl_combined_sampler_binding_offset = 16;
+	uint32_t wgsl_push_constant_group = 0;
+	uint32_t wgsl_push_constant_binding = 0;
+	bool wgsl_disallow_non_uniform_derivatives = false;
 	bool hlsl_compat = false;
 
 	bool hlsl_support_nonzero_base = false;
@@ -774,6 +780,7 @@ static void print_help_backend()
 	        "\t[--vulkan-semantics] or [-V]:\n\t\tEmit Vulkan GLSL instead of plain GLSL. Makes use of Vulkan-only features to match SPIR-V.\n"
 	        "\t[--msl]:\n\t\tEmit Metal Shading Language (MSL).\n"
 	        "\t[--hlsl]:\n\t\tEmit HLSL.\n"
+	        "\t[--wgsl]:\n\t\tEmit WGSL (WebGPU Shading Language).\n"
 	        "\t[--reflect]:\n\t\tEmit JSON reflection.\n"
 	        "\t[--cpp]:\n\t\tDEPRECATED. Emits C++ code.\n"
 	);
@@ -826,6 +833,18 @@ static void print_help_glsl()
 	                "\t[--glsl-force-flattened-io-blocks]:\n\t\tAlways flatten I/O blocks and structs.\n"
 	                "\t[--glsl-ovr-multiview-view-count count]:\n\t\tIn GL_OVR_multiview2, specify layout(num_views).\n"
 	                "\t[--glsl-descriptor-heap-set-binding desc_set binding]:\n\t\tInstead of layout(descriptor_heap), emit layout(set = desc_set, binding = binding) instead for compatibility with mapping API.\n"
+	);
+	// clang-format on
+}
+
+static void print_help_wgsl()
+{
+	// clang-format off
+	fprintf(stderr, "\nWGSL options:\n"
+	                "\t[--wgsl-combined-sampler-binding-offset <offset>]:\n\t\tCombined image samplers are split into a texture and a sampler. "
+	                "The sampler is assigned the binding of the combined image sampler plus this offset. Default is 16.\n"
+	                "\t[--wgsl-push-constant-binding <group> <binding>]:\n\t\tPush constant blocks are emitted as uniform buffers with this group and binding. Default is 0 0.\n"
+	                "\t[--wgsl-disallow-non-uniform-derivatives]:\n\t\tDo not emit diagnostic(off, derivative_uniformity) for shaders which use implicit derivatives.\n"
 	);
 	// clang-format on
 }
@@ -1070,6 +1089,7 @@ static void print_help_all()
 	print_help_glsl();
 	print_help_msl();
 	print_help_hlsl();
+	print_help_wgsl();
 	print_help_obscure();
 }
 
@@ -1095,6 +1115,7 @@ static void print_help()
 	                "\t[--help-glsl]\n"
 	                "\t[--help-msl]\n"
 	                "\t[--help-hlsl]\n"
+	                "\t[--help-wgsl]\n"
 	                "\t[--help-obscure]\n"
 	);
 	// clang-format on
@@ -1334,6 +1355,17 @@ static string compile_iteration(const CLIArguments &args, std::vector<uint32_t> 
 	}
 	else if (args.hlsl)
 		compiler.reset(new CompilerHLSL(std::move(spirv_parser.get_parsed_ir())));
+	else if (args.wgsl)
+	{
+		compiler.reset(new CompilerWGSL(std::move(spirv_parser.get_parsed_ir())));
+		auto *wgsl = static_cast<CompilerWGSL *>(compiler.get());
+		auto wgsl_opts = wgsl->get_wgsl_options();
+		wgsl_opts.combined_sampler_binding_offset = args.wgsl_combined_sampler_binding_offset;
+		wgsl_opts.push_constant_group = args.wgsl_push_constant_group;
+		wgsl_opts.push_constant_binding = args.wgsl_push_constant_binding;
+		wgsl_opts.allow_non_uniform_derivatives = !args.wgsl_disallow_non_uniform_derivatives;
+		wgsl->set_wgsl_options(wgsl_opts);
+	}
 	else
 	{
 		combined_image_samplers = !args.vulkan_semantics;
@@ -1436,7 +1468,7 @@ static string compile_iteration(const CLIArguments &args, std::vector<uint32_t> 
 	if (!entry_point.empty())
 		compiler->set_entry_point(entry_point, model);
 
-	if (!args.set_version && !compiler->get_common_options().version)
+	if (!args.set_version && !compiler->get_common_options().version && !args.wgsl)
 	{
 		fprintf(stderr, "Didn't specify GLSL version and SPIR-V did not specify language.\n");
 		print_help();
@@ -1674,6 +1706,10 @@ static int main_inner(int argc, char *argv[])
 		print_help_hlsl();
 		parser.end();
 	});
+	cbs.add("--help-wgsl", [](CLIParser &parser) {
+		print_help_wgsl();
+		parser.end();
+	});
 	cbs.add("--help-obscure", [](CLIParser &parser) {
 		print_help_obscure();
 		parser.end();
@@ -1730,6 +1766,15 @@ static int main_inner(int argc, char *argv[])
 	        [&args](CLIParser &) { args.force_zero_initialized_variables = true; });
 	cbs.add("--msl", [&args](CLIParser &) { args.msl = true; });
 	cbs.add("--hlsl", [&args](CLIParser &) { args.hlsl = true; });
+	cbs.add("--wgsl", [&args](CLIParser &) { args.wgsl = true; });
+	cbs.add("--wgsl-combined-sampler-binding-offset",
+	        [&args](CLIParser &parser) { args.wgsl_combined_sampler_binding_offset = parser.next_uint(); });
+	cbs.add("--wgsl-disallow-non-uniform-derivatives",
+	        [&args](CLIParser &) { args.wgsl_disallow_non_uniform_derivatives = true; });
+	cbs.add("--wgsl-push-constant-binding", [&args](CLIParser &parser) {
+		args.wgsl_push_constant_group = parser.next_uint();
+		args.wgsl_push_constant_binding = parser.next_uint();
+	});
 	cbs.add("--hlsl-enable-compat", [&args](CLIParser &) { args.hlsl_compat = true; });
 	cbs.add("--hlsl-support-nonzero-basevertex-baseinstance",
 	        [&args](CLIParser &) { args.hlsl_support_nonzero_base = true; });

@@ -1,0 +1,53 @@
+struct SSBO
+{
+    mvp : mat4x4f,
+    in_data : array<vec4f>,
+}
+
+struct SSBO2
+{
+    out_data : array<vec4f>,
+}
+
+const gl_WorkGroupSize : vec3u = vec3u(1u);
+
+@group(0) @binding(0) var<storage, read> _28 : SSBO;
+@group(0) @binding(1) var<storage, read_write> _52 : SSBO2;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    var _59 : vec4f;
+    var _60 : i32;
+    _60 = 0;
+    _59 = _28.in_data[gl_GlobalInvocationID.x];
+    var _42 : vec4f;
+    loop
+    {
+        _42 = _28.mvp * _59;
+        var _44 : i32 = _60 + 1;
+        if (_44 < 16)
+        {
+            _60 = _44;
+            _59 = _42;
+        }
+        else
+        {
+            break;
+        }
+    }
+    _52.out_data[gl_GlobalInvocationID.x] = _42;
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

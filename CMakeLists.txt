@@ -45,6 +45,7 @@ option(SPIRV_CROSS_ENABLE_TESTS "Enable SPIRV-Cross tests." ON)
 option(SPIRV_CROSS_ENABLE_GLSL "Enable GLSL support." ON)
 option(SPIRV_CROSS_ENABLE_HLSL "Enable HLSL target support." ON)
 option(SPIRV_CROSS_ENABLE_MSL "Enable MSL target support." ON)
+option(SPIRV_CROSS_ENABLE_WGSL "Enable WGSL target support." ON)
 option(SPIRV_CROSS_ENABLE_CPP "Enable C++ target support." ON)
 option(SPIRV_CROSS_ENABLE_REFLECT "Enable JSON reflection target support." ON)
 option(SPIRV_CROSS_ENABLE_C_API "Enable C API wrapper support in static library." ON)
@@ -246,6 +247,10 @@ set(spirv-cross-hlsl-sources
 		${CMAKE_CURRENT_SOURCE_DIR}/spirv_hlsl.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/spirv_hlsl.hpp)
 
+set(spirv-cross-wgsl-sources
+		${CMAKE_CURRENT_SOURCE_DIR}/spirv_wgsl.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/spirv_wgsl.hpp)
+
 set(spirv-cross-reflect-sources
 		${CMAKE_CURRENT_SOURCE_DIR}/spirv_reflect.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/spirv_reflect.hpp)
@@ -313,6 +318,16 @@ if (SPIRV_CROSS_STATIC)
 			target_link_libraries(spirv-cross-hlsl PRIVATE spirv-cross-glsl)
 		else()
 			message(FATAL_ERROR "Must enable GLSL support to enable HLSL support.")
+		endif()
+	endif()
+
+	if (SPIRV_CROSS_ENABLE_WGSL)
+		spirv_cross_add_library(spirv-cross-wgsl spirv_cross_wgsl STATIC
+				${spirv-cross-wgsl-sources})
+		if (SPIRV_CROSS_ENABLE_GLSL)
+			target_link_libraries(spirv-cross-wgsl PRIVATE spirv-cross-glsl)
+		else()
+			message(FATAL_ERROR "Must enable GLSL support to enable WGSL support.")
 		endif()
 	endif()
 
@@ -443,6 +458,10 @@ if (SPIRV_CROSS_CLI)
 		message(FATAL_ERROR "Must enable C++ if building CLI.")
 	endif()
 
+	if (NOT SPIRV_CROSS_ENABLE_WGSL)
+		message(FATAL_ERROR "Must enable WGSL if building CLI.")
+	endif()
+
 	if (NOT SPIRV_CROSS_ENABLE_REFLECT)
 		message(FATAL_ERROR "Must enable reflection if building CLI.")
 	endif()
@@ -468,6 +487,7 @@ if (SPIRV_CROSS_CLI)
 			spirv-cross-cpp
 			spirv-cross-reflect
 			spirv-cross-msl
+			spirv-cross-wgsl
 			spirv-cross-util
 			spirv-cross-core)
 
@@ -629,6 +649,16 @@ if (SPIRV_CROSS_CLI)
 						COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_shaders.py --hlsl --opt --parallel
 						${spirv-cross-externals}
 						${CMAKE_CURRENT_SOURCE_DIR}/shaders-hlsl
+						WORKING_DIRECTORY $<TARGET_FILE_DIR:spirv-cross>)
+				add_test(NAME spirv-cross-test-wgsl
+						COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_shaders.py --wgsl --parallel
+						${spirv-cross-externals}
+						${CMAKE_CURRENT_SOURCE_DIR}/shaders-wgsl
+						WORKING_DIRECTORY $<TARGET_FILE_DIR:spirv-cross>)
+				add_test(NAME spirv-cross-test-wgsl-opt
+						COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_shaders.py --wgsl --opt --parallel
+						${spirv-cross-externals}
+						${CMAKE_CURRENT_SOURCE_DIR}/shaders-wgsl
 						WORKING_DIRECTORY $<TARGET_FILE_DIR:spirv-cross>)
 				add_test(NAME spirv-cross-test-reflection
 						COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_shaders.py --reflect --parallel

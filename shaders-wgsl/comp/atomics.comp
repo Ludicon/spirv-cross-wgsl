@@ -1,0 +1,31 @@
+#version 450
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) buffer SSBO
+{
+	uint counter;
+	int signed_counter;
+	uint values[];
+} ssbo;
+
+shared uint shared_counter;
+shared int shared_values[64];
+
+void main()
+{
+	if (gl_LocalInvocationIndex == 0u)
+		shared_counter = 0u;
+	barrier();
+
+	uint prev = atomicAdd(shared_counter, 1u);
+	atomicMax(shared_values[gl_LocalInvocationIndex % 64u], int(prev));
+	barrier();
+
+	atomicAdd(ssbo.counter, prev);
+	atomicMin(ssbo.signed_counter, shared_values[gl_LocalInvocationIndex]);
+	atomicOr(ssbo.values[gl_GlobalInvocationID.x], 1u);
+	atomicXor(ssbo.values[gl_GlobalInvocationID.x], 2u);
+	atomicAnd(ssbo.values[gl_GlobalInvocationID.x], 3u);
+	uint old = atomicExchange(ssbo.values[gl_GlobalInvocationID.x + 1u], 4u);
+	atomicCompSwap(ssbo.values[gl_GlobalInvocationID.x + 2u], old, 5u);
+}

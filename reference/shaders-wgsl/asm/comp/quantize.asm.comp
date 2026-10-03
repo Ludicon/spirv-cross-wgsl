@@ -1,0 +1,23 @@
+struct SSBO0
+{
+    scalar : f32,
+    vec2_val : vec2f,
+    vec3_val : vec3f,
+    vec4_val : vec4f,
+}
+
+@group(0) @binding(0) var<storage, read_write> _12 : SSBO0;
+
+fn comp_main()
+{
+    _12.scalar = quantizeToF16(_12.scalar);
+    _12.vec2_val = quantizeToF16(_12.vec2_val);
+    _12.vec3_val = quantizeToF16(_12.vec3_val);
+    _12.vec4_val = quantizeToF16(_12.vec4_val);
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main()
+{
+    comp_main();
+}
