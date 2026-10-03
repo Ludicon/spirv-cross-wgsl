@@ -742,6 +742,7 @@ struct CLIArguments
 	uint32_t wgsl_push_constant_group = 0;
 	uint32_t wgsl_push_constant_binding = 0;
 	bool wgsl_disallow_non_uniform_derivatives = false;
+	bool wgsl_resolve_binding_conflicts = false;
 	SmallVector<WGSLWarning> wgsl_disabled_warnings;
 	bool hlsl_compat = false;
 
@@ -844,6 +845,8 @@ static void print_help_wgsl()
 	fprintf(stderr, "\nWGSL options:\n"
 	                "\t[--wgsl-combined-sampler-binding-offset <offset>]:\n\t\tCombined image samplers are split into a texture and a sampler. "
 	                "The sampler is assigned the binding of the combined image sampler plus this offset. Default is 16.\n"
+	                "\t[--wgsl-resolve-binding-conflicts]:\n\t\tAssign bindings like tint's SPIR-V reader: the sampler of a combined image sampler takes the next binding,\n"
+	                "\t\tand later bindings in the same group used by the entry point are shifted to avoid conflicts. Overrides --wgsl-combined-sampler-binding-offset.\n"
 	                "\t[--wgsl-push-constant-binding <group> <binding>]:\n\t\tPush constant blocks are emitted as uniform buffers with this group and binding. Default is 0 0.\n"
 	                "\t[--wgsl-disable-warning <name>]:\n\t\tDo not report a warning. Can be given multiple times. Warnings are:\n"
 	                "\t\t  non-finite-constant: infinity or NaN constants computed at runtime with spvNonFinite().\n"
@@ -1372,6 +1375,7 @@ static string compile_iteration(const CLIArguments &args, std::vector<uint32_t> 
 		wgsl_opts.push_constant_group = args.wgsl_push_constant_group;
 		wgsl_opts.push_constant_binding = args.wgsl_push_constant_binding;
 		wgsl_opts.allow_non_uniform_derivatives = !args.wgsl_disallow_non_uniform_derivatives;
+		wgsl_opts.resolve_binding_conflicts = args.wgsl_resolve_binding_conflicts;
 		wgsl->set_wgsl_options(wgsl_opts);
 		for (auto warning : args.wgsl_disabled_warnings)
 			wgsl->set_warning_enabled(warning, false);
@@ -1785,6 +1789,8 @@ static int main_inner(int argc, char *argv[])
 	cbs.add("--wgsl", [&args](CLIParser &) { args.wgsl = true; });
 	cbs.add("--wgsl-combined-sampler-binding-offset",
 	        [&args](CLIParser &parser) { args.wgsl_combined_sampler_binding_offset = parser.next_uint(); });
+	cbs.add("--wgsl-resolve-binding-conflicts",
+	        [&args](CLIParser &) { args.wgsl_resolve_binding_conflicts = true; });
 	cbs.add("--wgsl-disable-warning", [&args](CLIParser &parser) {
 		std::string name = parser.next_string();
 		WGSLWarning warning;

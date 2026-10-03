@@ -39,7 +39,8 @@ using namespace SPIRV_CROSS_SPV_HEADER_NAMESPACE;
 //
 // WGSL has no combined image samplers. Combined image samplers are split into a texture which keeps
 // the original binding, and a sampler named <texture>_sampler, which is assigned
-// binding + combined_sampler_binding_offset in the same group.
+// binding + combined_sampler_binding_offset in the same group. Alternatively, resolve_binding_conflicts
+// assigns bindings the same way as tint's SPIR-V reader.
 //
 // WGSL has no push constants. Push constant blocks are emitted as uniform buffers using
 // push_constant_group and push_constant_binding.
@@ -80,6 +81,14 @@ public:
 	{
 		// Binding offset applied to the sampler part of combined image samplers.
 		uint32_t combined_sampler_binding_offset = 16;
+
+		// If enabled, assign bindings the same way as tint's SPIR-V reader (the SPIRV-Tools
+		// split-combined-image-sampler and resolve-binding-conflicts passes): the sampler part of a combined
+		// image sampler shares the binding of its texture, and then, within each group, the resources used by
+		// the entry point are sorted by binding (samplers after textures) and any binding which is not greater
+		// than the previous one is moved to the previous binding + 1. combined_sampler_binding_offset is ignored.
+		// In library modules there is no entry point, so every resource is considered used.
+		bool resolve_binding_conflicts = false;
 
 		// Group and binding used for push constant blocks.
 		uint32_t push_constant_group = 0;
@@ -200,6 +209,8 @@ private:
 	};
 
 	void emit_resources();
+	void resolve_binding_conflicts();
+	std::string binding_attributes(uint32_t var_id, bool sampler_part = false);
 	void emit_struct_wgsl(SPIRType &type);
 	void prepare_buffer_layouts();
 	uint32_t build_padded_physical_type(uint32_t type_id, bool transpose);
@@ -287,6 +298,11 @@ private:
 	bool uses_implicit_derivatives = false;
 	bool requires_non_finite_helper = false;
 	bool uses_workgroup_size_constant = false;
+
+	// Bindings assigned by resolve_binding_conflicts(), for textures/buffers/samplers and for the sampler part
+	// of combined image samplers.
+	std::unordered_map<uint32_t, uint32_t> resolved_bindings;
+	std::unordered_map<uint32_t, uint32_t> resolved_sampler_bindings;
 
 	// WGSL has no 16-bit integers. If they are only used as truncated intermediates of int to float conversions,
 	// they are carried in 32-bit integers.

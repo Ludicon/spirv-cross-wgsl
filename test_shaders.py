@@ -660,6 +660,8 @@ def cross_compile_wgsl(shader, spirv, opt, force_no_external_validation, iterati
     if not is_library:
         wgsl_args += ['--entry', 'main']
     wgsl_args += ['--output', wgsl_path, spirv_path, '--wgsl', '--iterations', str(iterations)]
+    if '.resolve-binding-conflicts.' in shader:
+        wgsl_args.append('--wgsl-resolve-binding-conflicts')
     subprocess.check_call(wgsl_args)
 
     if not shader_is_invalid_spirv(wgsl_path):

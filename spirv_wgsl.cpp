@@ -135,6 +135,8 @@ string CompilerWGSL::compile()
 	update_active_builtins();
 	analyze_image_and_sampler_usage();
 	analyze_atomics();
+	if (wgsl_options.resolve_binding_conflicts)
+		resolve_binding_conflicts();
 	analyze_mutable_temporaries();
 	analyze_single_store_variables();
 	analyze_transient_16bit_integers();
@@ -2524,11 +2526,127 @@ void CompilerWGSL::emit_constants_and_structs()
 		statement("");
 }
 
-static string binding_attributes(const Compiler &compiler, uint32_t id, uint32_t binding_offset = 0)
+string CompilerWGSL::binding_attributes(uint32_t var_id, bool sampler_part)
 {
-	uint32_t group = compiler.get_decoration(id, DecorationDescriptorSet);
-	uint32_t binding = compiler.get_decoration(id, DecorationBinding) + binding_offset;
+	uint32_t group = get_decoration(var_id, DecorationDescriptorSet);
+	uint32_t binding = get_decoration(var_id, DecorationBinding);
+
+	if (wgsl_options.resolve_binding_conflicts)
+	{
+		auto &bindings = sampler_part ? resolved_sampler_bindings : resolved_bindings;
+		auto itr = bindings.find(var_id);
+		if (itr != bindings.end())
+			binding = itr->second;
+	}
+	else if (sampler_part)
+		binding += wgsl_options.combined_sampler_binding_offset;
+
 	return join("@group(", group, ") @binding(", binding, ") ");
+}
+
+void CompilerWGSL::resolve_binding_conflicts()
+{
+	// Mirrors tint's SPIR-V reader, which runs these steps:
+	// 1. SPIRV-Tools split-combined-image-sampler: every combined image sampler becomes a new sampler variable
+	//    followed by a new image variable, both with the original binding and with IDs above all existing IDs.
+	// 2. SPIRV-Tools resolve-binding-conflicts: per group, the resources statically used by the entry point are
+	//    sorted by binding, then samplers after non-samplers, then by ID, and every binding which is not greater
+	//    than the previous one becomes the previous binding + 1.
+	// 3. tint RemapSamplers: any sampler which still shares its binding point with another variable, used or not,
+	//    is moved to the highest binding in its group + 1, in declaration order.
+	resolved_bindings.clear();
+	resolved_sampler_bindings.clear();
+
+	unordered_set<VariableID> active;
+	if (!ir.is_library_module)
+		active = get_active_interface_variables();
+
+	struct Resource
+	{
+		uint32_t var_id;
+		uint32_t group;
+		uint32_t binding;
+		bool sampler;      // Sampler-like resources sort after textures with the same binding.
+		bool sampler_part; // The sampler half of a combined image sampler.
+		uint32_t order;    // ID of the variable after splitting combined image samplers.
+		bool active;
+	};
+	SmallVector<Resource> resources;
+
+	uint32_t split_id = uint32_t(ir.ids.size());
+	ir.for_each_typed_id<SPIRVariable>(
+	    [&](uint32_t, SPIRVariable &var)
+	    {
+		    if (var.storage == StorageClassFunction || var.storage == StorageClassInput ||
+		        var.storage == StorageClassOutput || var.storage == StorageClassPushConstant)
+			    return;
+		    if (!has_decoration(var.self, DecorationDescriptorSet) || !has_decoration(var.self, DecorationBinding))
+			    return;
+
+		    auto *type = &get_variable_data_type(var);
+		    while (!type->array.empty())
+			    type = &get<SPIRType>(type->parent_type);
+
+		    uint32_t group = get_decoration(var.self, DecorationDescriptorSet);
+		    uint32_t binding = get_decoration(var.self, DecorationBinding);
+		    bool is_active = ir.is_library_module || active.count(var.self) != 0;
+
+		    if (type->basetype == SPIRType::SampledImage)
+		    {
+			    uint32_t sampler_order = split_id++;
+			    uint32_t image_order = split_id++;
+			    resources.push_back({ var.self, group, binding, true, true, sampler_order, is_active });
+			    resources.push_back({ var.self, group, binding, false, false, image_order, is_active });
+		    }
+		    else
+		    {
+			    resources.push_back(
+			        { var.self, group, binding, type->basetype == SPIRType::Sampler, false, var.self, is_active });
+		    }
+	    });
+
+	// Step 2, resolve conflicts between the resources used by the entry point.
+	unordered_map<uint32_t, SmallVector<Resource *>> groups;
+	for (auto &res : resources)
+		if (res.active)
+			groups[res.group].push_back(&res);
+
+	for (auto &group : groups)
+	{
+		auto &list = group.second;
+		stable_sort(list.begin(), list.end(),
+		            [](const Resource *a, const Resource *b)
+		            {
+			            if (a->binding != b->binding)
+				            return a->binding < b->binding;
+			            if (a->sampler != b->sampler)
+				            return b->sampler;
+			            return a->order < b->order;
+		            });
+
+		for (size_t i = 1; i < list.size(); i++)
+			if (list[i]->binding <= list[i - 1]->binding)
+				list[i]->binding = list[i - 1]->binding + 1;
+	}
+
+	// Step 3, move samplers which still share a binding point.
+	unordered_map<uint32_t, uint32_t> max_binding;
+	unordered_map<uint64_t, uint32_t> binding_use_count;
+	for (auto &res : resources)
+	{
+		auto &m = max_binding[res.group];
+		m = max(m, res.binding);
+		binding_use_count[(uint64_t(res.group) << 32) | res.binding]++;
+	}
+
+	for (auto &res : resources)
+	{
+		if (res.sampler && binding_use_count[(uint64_t(res.group) << 32) | res.binding] > 1)
+			res.binding = ++max_binding[res.group];
+	}
+
+	for (auto &res : resources)
+		(res.sampler_part ? resolved_sampler_bindings : resolved_bindings)[res.var_id] = res.binding;
 }
 
 void CompilerWGSL::emit_buffer_block(const SPIRVariable &var)
@@ -2552,7 +2670,7 @@ void CompilerWGSL::emit_buffer_block(const SPIRVariable &var)
 	else
 		space = "uniform";
 
-	statement(binding_attributes(*this, var.self), "var<", space, "> ", to_name(var.self), " : ",
+	statement(binding_attributes(var.self), "var<", space, "> ", to_name(var.self), " : ",
 	          type_to_glsl(type, var.self), ";");
 }
 
@@ -2584,14 +2702,14 @@ void CompilerWGSL::emit_uniform(const SPIRVariable &var)
 	switch (type.basetype)
 	{
 	case SPIRType::SampledImage:
-		statement(binding_attributes(*this, var.self), "var ", name, " : ", type_to_glsl(type, var.self), ";");
-		statement(binding_attributes(*this, var.self, wgsl_options.combined_sampler_binding_offset), "var ", name,
+		statement(binding_attributes(var.self), "var ", name, " : ", type_to_glsl(type, var.self), ";");
+		statement(binding_attributes(var.self, true), "var ", name,
 		          "_sampler : ", is_comparison_sampler(var.self) ? "sampler_comparison" : "sampler", ";");
 		break;
 
 	case SPIRType::Image:
 	case SPIRType::Sampler:
-		statement(binding_attributes(*this, var.self), "var ", name, " : ", type_to_glsl(type, var.self), ";");
+		statement(binding_attributes(var.self), "var ", name, " : ", type_to_glsl(type, var.self), ";");
 		break;
 
 	default:
