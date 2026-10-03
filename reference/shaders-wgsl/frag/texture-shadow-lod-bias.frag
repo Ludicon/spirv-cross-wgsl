@@ -9,7 +9,7 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var r : f32 = 0.0f;
+    var r = 0.0f;
     r += textureSampleCompare(uShadow2DArray, uShadow2DArray_sampler, vUV.xy, i32(round(vUV.z)), vUV.w);
     r += textureSampleCompare(uShadow2DArray, uShadow2DArray_sampler, vUV.xy, i32(round(vUV.z)), vUV.w, vec2i(1));
     FragColor = vec4f(r);

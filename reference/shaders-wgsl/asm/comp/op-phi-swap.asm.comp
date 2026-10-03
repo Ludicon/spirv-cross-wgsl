@@ -10,7 +10,7 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var _26 : f32 = 8.5f;
+    var _26 = 8.5f;
     var _34 : bool;
     var _35 : f32;
     var _35_copy : f32;

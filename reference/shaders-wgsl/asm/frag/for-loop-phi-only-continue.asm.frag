@@ -10,7 +10,7 @@ fn frag_main()
     var _28 : i32;
     loop
     {
-        var _22 : bool = _47 < 16;
+        let _22 = _47 < 16;
         if (_22)
         {
             _25 = _50 + 1.0f;

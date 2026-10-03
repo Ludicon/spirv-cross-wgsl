@@ -15,13 +15,13 @@ struct _4
 
 fn comp_main()
 {
-    var _30 : vec4i = _5._m0;
-    var _31 : vec4u = _5._m1;
-    var _34 : vec4<bool> = bitcast<vec4i>(_31) == _30;
-    var _36 : vec4<bool> = _31 == _31;
-    var _37 : vec4<bool> = _30 == _30;
-    var _38 : vec4u = select(vec4u(0u), vec4u(1u), _34);
-    var _42 : vec4i = select(vec4i(0), vec4i(1), _34);
+    let _30 = _5._m0;
+    let _31 = _5._m1;
+    let _34 = bitcast<vec4i>(_31) == _30;
+    let _36 = _31 == _31;
+    let _37 = _30 == _30;
+    let _38 = select(vec4u(0u), vec4u(1u), _34);
+    let _42 = select(vec4i(0), vec4i(1), _34);
     _6._m0 = _38;
     _6._m0 = _38;
     _6._m0 = select(vec4u(0u), vec4u(1u), _36);

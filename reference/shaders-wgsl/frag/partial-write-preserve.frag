@@ -77,27 +77,27 @@ fn branchy_inout_2_29(b : ptr<function, B>)
 
 fn frag_main()
 {
-    var a : vec4f = vec4f(10.0f);
-    var param : vec4f = a;
+    var a = vec4f(10.0f);
+    var param = a;
     partial_inout(&param);
     a = param;
     var param_1 : vec4f;
     complete_inout(&param_1);
     a = param_1;
-    var param_2 : vec4f = a;
+    var param_2 = a;
     branchy_inout(&param_2);
     a = param_2;
     var param_3 : vec4f;
     branchy_inout_2(&param_3);
     a = param_3;
-    var b : B = B(10.0f, 20.0f);
-    var param_4 : B = b;
+    var b = B(10.0f, 20.0f);
+    var param_4 = b;
     partial_inout_17(&param_4);
     b = param_4;
     var param_5 : B;
     complete_inout_35(&param_5);
     b = param_5;
-    var param_6 : B = b;
+    var param_6 = b;
     branchy_inout_23(&param_6);
     b = param_6;
     var param_7 : B;

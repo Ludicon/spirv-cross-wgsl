@@ -8,7 +8,7 @@ fn frag_main()
     var _37 : vec4f;
     loop
     {
-        var _35 : vec2f = vec2f(0.0f);
+        let _35 = vec2f(0.0f);
         if (_35.x != 0.0f)
         {
             _37 = vec4f(1.0f, 0.0f, 0.0f, 1.0f);

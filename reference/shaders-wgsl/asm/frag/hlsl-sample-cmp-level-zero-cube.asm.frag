@@ -5,7 +5,7 @@ var<private> _entryPointOutput : f32;
 
 fn _main() -> f32
 {
-    var _29 : vec4f = vec4f(0.100000001490116119384765625f, 0.100000001490116119384765625f, 0.100000001490116119384765625f, 0.5f);
+    let _29 = vec4f(0.100000001490116119384765625f, 0.100000001490116119384765625f, 0.100000001490116119384765625f, 0.5f);
     return textureSampleCompareLevel(pointLightShadowMap, shadowSamplerPCF, _29.xyz, _29.w);
 }
 

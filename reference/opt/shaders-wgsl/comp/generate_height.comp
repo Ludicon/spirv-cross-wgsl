@@ -13,8 +13,6 @@ struct HeightmapFFT
     heights : array<u32>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(64u, 1u, 1u);
-
 @group(0) @binding(0) var<storage, read> _137 : Distribution;
 @group(0) @binding(2) var<uniform> _166 : UBO;
 @group(0) @binding(1) var<storage, read_write> _225 : HeightmapFFT;
@@ -24,9 +22,9 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var _265 : vec2u = vec2u(64u, 1u) * gl_NumWorkGroups.xy;
-    var _270 : vec2u = _265 - gl_GlobalInvocationID.xy;
-    var _272 : vec2<bool> = gl_GlobalInvocationID.xy == vec2u(0u);
+    let _265 = vec2u(64u, 1u) * gl_NumWorkGroups.xy;
+    let _270 = _265 - gl_GlobalInvocationID.xy;
+    let _272 = gl_GlobalInvocationID.xy == vec2u(0u);
     var _460 : u32;
     if (_272.x)
     {
@@ -45,18 +43,18 @@ fn comp_main()
     {
         _461 = _270.y;
     }
-    var _277 : u32 = _265.x;
-    var _281 : u32 = (gl_GlobalInvocationID.y * _277) + gl_GlobalInvocationID.x;
-    var _291 : u32 = (_461 * _277) + _460;
-    var _298 : vec2f = vec2f(gl_GlobalInvocationID.xy);
-    var _300 : vec2f = vec2f(_265);
-    var _310 : f32 = sqrt(9.81000041961669921875f * length(_166.uModTime.xy * select(_298, _298 - _300, _298 > (_300 * 0.5f)))) * _166.uModTime.z;
-    var _317 : vec2f = vec2f(cos(_310), sin(_310));
-    var _391 : vec2f = _317.xx;
-    var _396 : vec2f = _317.yy;
-    var _399 : vec2f = _396 * _137.distribution[_281].yx;
-    var _426 : vec2f = _396 * _137.distribution[_291].yx;
-    var _434 : vec2f = (_137.distribution[_291] * _391) + vec2f(-_426.x, _426.y);
+    let _277 = _265.x;
+    let _281 = (gl_GlobalInvocationID.y * _277) + gl_GlobalInvocationID.x;
+    let _291 = (_461 * _277) + _460;
+    let _298 = vec2f(gl_GlobalInvocationID.xy);
+    let _300 = vec2f(_265);
+    let _310 = sqrt(9.81000041961669921875f * length(_166.uModTime.xy * select(_298, _298 - _300, _298 > (_300 * 0.5f)))) * _166.uModTime.z;
+    let _317 = vec2f(cos(_310), sin(_310));
+    let _391 = _317.xx;
+    let _396 = _317.yy;
+    let _399 = _396 * _137.distribution[_281].yx;
+    let _426 = _396 * _137.distribution[_291].yx;
+    let _434 = (_137.distribution[_291] * _391) + vec2f(-_426.x, _426.y);
     _225.heights[_281] = pack2x16float(((_137.distribution[_281] * _391) + vec2f(-_399.x, _399.y)) + vec2f(_434.x, -_434.y));
 }
 

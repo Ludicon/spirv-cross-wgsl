@@ -7,13 +7,13 @@ fn frag_main()
         default:
         {
             FragColor = 16;
-            for (var _143 : i32 = 0; _143 < 25; )
+            for (var _143 = 0; _143 < 25; )
             {
                 FragColor += 10;
                 _143++;
                 continue;
             }
-            for (var _144 : i32 = 1; _144 < 30; )
+            for (var _144 = 1; _144 < 30; )
             {
                 FragColor += 11;
                 _144++;
@@ -27,11 +27,11 @@ fn frag_main()
                 _145++;
                 continue;
             }
-            var _62 : i32 = _145 + 3;
+            let _62 = _145 + 3;
             FragColor += _62;
             if (_62 == 40)
             {
-                for (var _149 : i32 = 0; _149 < 40; )
+                for (var _149 = 0; _149 < 40; )
                 {
                     FragColor += 13;
                     _149++;
@@ -45,12 +45,12 @@ fn frag_main()
             for (; _146.x < 10; )
             {
                 FragColor += _146.y;
-                var _142 : vec2i = _146;
+                var _142 = _146;
                 _142.x = _146.x + 4;
                 _146 = _142;
                 continue;
             }
-            for (var _148 : i32 = _62; _148 < 40; )
+            for (var _148 = _62; _148 < 40; )
             {
                 FragColor += _148;
                 _148++;

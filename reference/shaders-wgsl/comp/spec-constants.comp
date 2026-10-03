@@ -24,11 +24,11 @@ var<workgroup> cache : array<f32, _21>;
 
 fn comp_main()
 {
-    var idx : u32 = gl_LocalInvocationIndex;
+    let idx = gl_LocalInvocationIndex;
     cache[idx] = ssbo.data[gl_GlobalInvocationID.x];
     workgroupBarrier();
-    var s : f32 = 0.0f;
-    for (var i : i32 = 0; i < DOUBLE_COUNT; i++)
+    var s = 0.0f;
+    for (var i = 0; i < DOUBLE_COUNT; i++)
     {
         s += cache[(idx + bitcast<u32>(i)) % _64];
     }

@@ -4,7 +4,7 @@ var<private> accum : vec4f;
 fn frag_main()
 {
     result = vec4f(0.0f);
-    for (var _48 : i32 = 0; _48 < 4; )
+    for (var _48 = 0; _48 < 4; )
     {
         result += accum;
         _48 += bitcast<i32>(select(30u, 40u, accum.y > 10.0f));

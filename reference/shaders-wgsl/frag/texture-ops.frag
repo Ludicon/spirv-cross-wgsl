@@ -23,7 +23,7 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var c : vec4f = textureSample(uTex, uTex_sampler, vUV);
+    var c = textureSample(uTex, uTex_sampler, vUV);
     c += textureSampleBias(uTex, uTex_sampler, vUV, 1.0f);
     c += textureSampleLevel(uTex, uTex_sampler, vUV, 2.0f);
     c += textureSampleGrad(uTex, uTex_sampler, vUV, dpdx(vUV), dpdy(vUV));
@@ -38,17 +38,17 @@ fn frag_main()
     c += textureSample(uCube, uCube_sampler, vDir);
     c += textureSampleLevel(uCube, uCube_sampler, vDir, 3.0f);
     c += textureSample(uVolume, uVolume_sampler, vDir);
-    var _149 : vec3f = vec3f(vUV, 0.5f);
+    let _149 = vec3f(vUV, 0.5f);
     c += vec4f(textureSampleCompare(uShadow, uShadow_sampler, _149.xy, _149.z));
-    var _159 : vec3f = vec3f(vUV, 0.5f);
+    let _159 = vec3f(vUV, 0.5f);
     c += vec4f(textureSampleCompareLevel(uShadow, uShadow_sampler, _159.xy, _159.z));
-    var _173 : vec4f = vec4f(vUV, 1.0f, 0.5f);
+    let _173 = vec4f(vUV, 1.0f, 0.5f);
     c += vec4f(textureSampleCompare(uShadowArray, uShadowArray_sampler, _173.xy, i32(round(_173.z)), _173.w));
     c += textureGatherCompare(uShadow, uShadow_sampler, vUV, 0.5f);
     c += textureLoad(uMSTex, vec2i(vUV * 64.0f), 2);
     c += textureSample(uTex1D, uTex1D_sampler, vUV.x);
-    var size : vec2i = (vec2i(textureDimensions(uTex, 0)) + vec3i(vec2i(textureDimensions(uTexArray, 1)), i32(textureNumLayers(uTexArray))).xy) + vec2i(textureDimensions(uMSTex));
-    var levels : i32 = i32(textureNumLevels(uTex)) + i32(textureNumSamples(uMSTex));
+    let size = (vec2i(textureDimensions(uTex, 0)) + vec3i(vec2i(textureDimensions(uTexArray, 1)), i32(textureNumLayers(uTexArray))).xy) + vec2i(textureDimensions(uMSTex));
+    let levels = i32(textureNumLevels(uTex)) + i32(textureNumSamples(uMSTex));
     FragColor = c + vec4f(vec2f(size), f32(levels), 0.0f);
 }
 

@@ -3,15 +3,13 @@ struct SSBO2
     out_data : array<mat3x3f>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(1) var<storage, read_write> _22 : SSBO2;
 
 var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var ident : u32 = gl_GlobalInvocationID.x;
+    let ident = gl_GlobalInvocationID.x;
     _22.out_data[ident] = mat3x3f(vec3f(10.0f), vec3f(20.0f), vec3f(40.0f));
 }
 

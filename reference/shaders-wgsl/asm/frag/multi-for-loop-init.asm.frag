@@ -5,15 +5,15 @@ var<private> ucounter : u32;
 fn frag_main()
 {
     FragColor = vec4f(0.0f);
-    var i : i32 = 0;
-    var j : u32 = 1u;
+    var i = 0;
+    var j = 1u;
     loop
     {
-        var _23 : i32 = i;
-        var _26 : bool = _23 < 10;
-        var _27 : u32 = j;
-        var _29 : bool = bitcast<i32>(_27) < bitcast<i32>(20u);
-        var _30 : bool = _26 && _29;
+        let _23 = i;
+        let _26 = _23 < 10;
+        let _27 = j;
+        let _29 = bitcast<i32>(_27) < bitcast<i32>(20u);
+        let _30 = _26 && _29;
         if (_30)
         {
             FragColor += vec4f(f32(i));

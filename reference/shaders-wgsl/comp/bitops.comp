@@ -6,14 +6,12 @@ struct SSBO
     ushift : u32,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<storage, read_write> ssbo : SSBO;
 
 fn comp_main()
 {
-    var a : vec4i = ssbo.i;
-    var b : vec4u = ssbo.u;
+    let a = ssbo.i;
+    let b = ssbo.u;
     ssbo.i = ((a << vec4u(vec4i(ssbo.shift))) + (a >> vec4u(vec4i(bitcast<i32>(ssbo.ushift))))) + bitcast<vec4i>(b >> vec4u(3u));
     ssbo.u = (b << vec4u(2u)) ^ (b >> vec4u(vec4i(ssbo.shift)));
     ssbo.i += (((extractBits(a, u32(1), u32(4)) + firstTrailingBit(a)) + bitcast<vec4i>(firstLeadingBit(b))) + bitcast<vec4i>(countOneBits(b)));

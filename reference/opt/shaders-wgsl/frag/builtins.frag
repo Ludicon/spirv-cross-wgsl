@@ -17,7 +17,7 @@ fn frag_main()
     {
         _56 = gl_FragCoord;
     }
-    var _29 : vec4f = _56 + vec4f(f32(gl_SampleID));
+    let _29 = _56 + vec4f(f32(gl_SampleID));
     gl_SampleMask[0] = gl_SampleMaskIn[0] & 3;
     gl_FragDepth = _29.z * 0.5f;
     FragColor = _29;

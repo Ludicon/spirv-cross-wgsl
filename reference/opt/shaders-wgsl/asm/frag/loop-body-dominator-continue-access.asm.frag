@@ -21,7 +21,7 @@ fn frag_main()
         {
             var _233 : bool;
             var _237 : i32;
-            var _230 : u32 = 0u;
+            var _230 = 0u;
             loop
             {
                 if (_230 < _16.shadowCascadesNum)
@@ -40,10 +40,10 @@ fn frag_main()
                             break;
                         }
                     }
-                    var _178 : vec4f = (_231 * transpose(_16.lightVP[_230])) * vec4f(fragWorld, 1.0f);
-                    var _180 : f32 = _178.z;
-                    var _187 : f32 = _178.x;
-                    var _189 : f32 = _178.y;
+                    let _178 = (_231 * transpose(_16.lightVP[_230])) * vec4f(fragWorld, 1.0f);
+                    let _180 = _178.z;
+                    let _187 = _178.x;
+                    let _189 = _178.y;
                     if ((((_180 >= 0.0f) && (_180 <= 1.0f)) && (max(_187, _189) <= 1.0f)) && (min(_187, _189) >= 0.0f))
                     {
                         _237 = bitcast<i32>(_230);

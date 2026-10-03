@@ -4,8 +4,6 @@ struct UBO
     uScale : vec4f,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(8u, 8u, 1u);
-
 @group(0) @binding(4) var<uniform> _46 : UBO;
 @group(0) @binding(0) var uHeight : texture_2d<f32>;
 @group(0) @binding(16) var uHeight_sampler : sampler;
@@ -18,12 +16,12 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var _59 : vec4f = (vec2f(gl_GlobalInvocationID.xy) * _46.uInvSize.xy).xyxy + (_46.uInvSize * 0.5f);
-    var _67 : vec2f = _59.xy;
-    var _128 : vec2f = _59.zw;
-    var _157 : vec2f = ((textureSampleLevel(uDisplacement, uDisplacement_sampler, _128, 0.0f, vec2i(1, 0)).xy - textureSampleLevel(uDisplacement, uDisplacement_sampler, _128, 0.0f, vec2i(-1, 0)).xy) * 0.60000002384185791015625f) * _46.uScale.z;
-    var _161 : vec2f = ((textureSampleLevel(uDisplacement, uDisplacement_sampler, _128, 0.0f, vec2i(0, 1)).xy - textureSampleLevel(uDisplacement, uDisplacement_sampler, _128, 0.0f, vec2i(0, -1)).xy) * 0.60000002384185791015625f) * _46.uScale.z;
-    var _172 : vec2i = bitcast<vec2i>(gl_GlobalInvocationID.xy);
+    let _59 = (vec2f(gl_GlobalInvocationID.xy) * _46.uInvSize.xy).xyxy + (_46.uInvSize * 0.5f);
+    let _67 = _59.xy;
+    let _128 = _59.zw;
+    let _157 = ((textureSampleLevel(uDisplacement, uDisplacement_sampler, _128, 0.0f, vec2i(1, 0)).xy - textureSampleLevel(uDisplacement, uDisplacement_sampler, _128, 0.0f, vec2i(-1, 0)).xy) * 0.60000002384185791015625f) * _46.uScale.z;
+    let _161 = ((textureSampleLevel(uDisplacement, uDisplacement_sampler, _128, 0.0f, vec2i(0, 1)).xy - textureSampleLevel(uDisplacement, uDisplacement_sampler, _128, 0.0f, vec2i(0, -1)).xy) * 0.60000002384185791015625f) * _46.uScale.z;
+    let _172 = bitcast<vec2i>(gl_GlobalInvocationID.xy);
     textureStore(iHeightDisplacement, _172, vec4f(textureSampleLevel(uHeight, uHeight_sampler, _67, 0.0f).x, 0.0f, 0.0f, 0.0f));
     textureStore(iGradJacobian, _172, vec4f((_46.uScale.xy * 0.5f) * vec2f(textureSampleLevel(uHeight, uHeight_sampler, _67, 0.0f, vec2i(1, 0)).x - textureSampleLevel(uHeight, uHeight_sampler, _67, 0.0f, vec2i(-1, 0)).x, textureSampleLevel(uHeight, uHeight_sampler, _67, 0.0f, vec2i(0, 1)).x - textureSampleLevel(uHeight, uHeight_sampler, _67, 0.0f, vec2i(0, -1)).x), ((1.0f + _157.x) * (1.0f + _161.y)) - (_157.y * _161.x), 0.0f));
 }

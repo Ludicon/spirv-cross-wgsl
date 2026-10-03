@@ -29,13 +29,13 @@ var<private> FragColor : f32;
 fn frag_main()
 {
     let _22_frexp = frexp(v0 + 1.0f);
-    var _22 : ResType = ResType(_22_frexp.fract, _22_frexp.exp);
+    let _22 = ResType(_22_frexp.fract, _22_frexp.exp);
     let _35_frexp = frexp(v1);
-    var _35 : ResType_1 = ResType_1(_35_frexp.fract, _35_frexp.exp);
+    let _35 = ResType_1(_35_frexp.fract, _35_frexp.exp);
     let _42_modf = modf(v0);
-    var _42 : ResType_2 = ResType_2(_42_modf.fract, _42_modf.whole);
+    let _42 = ResType_2(_42_modf.fract, _42_modf.whole);
     let _49_modf = modf(v1);
-    var _49 : ResType_3 = ResType_3(_49_modf.fract, _49_modf.whole);
+    let _49 = ResType_3(_49_modf.fract, _49_modf.whole);
     FragColor = ((((_22._m0 + _35._m0.x) + _35._m0.y) + _42._m0) + _49._m0.x) + _49._m0.y;
 }
 

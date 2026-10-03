@@ -3,8 +3,8 @@ var<private> fragColor : vec4f;
 fn frag_main()
 {
     var f4 : vec4f;
-    var c : i32 = i32(f4.x);
-    for (var j : i32 = 0; j < c; j++)
+    let c = i32(f4.x);
+    for (var j = 0; j < c; j++)
     {
         switch (c)
         {
@@ -20,11 +20,11 @@ fn frag_main()
             }
             default:
             {
-                var i : i32 = 0;
+                var i = 0;
                 loop
                 {
-                    var _48 : i32 = i;
-                    var _50 : i32 = _48 + 1;
+                    let _48 = i;
+                    let _50 = _48 + 1;
                     i = _50;
                     if (_48 < c)
                     {

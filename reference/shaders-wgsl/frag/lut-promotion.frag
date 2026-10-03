@@ -23,13 +23,13 @@ fn frag_main()
     {
         FragColor += _60[index & 1].x;
     }
-    var foobar : array<vec4f, 4> = _60;
+    var foobar = _60;
     if (index > 30)
     {
         foobar[1].z = 20.0f;
     }
     FragColor += foobar[index & 3].z;
-    var baz : array<vec4f, 4> = _60;
+    var baz = _60;
     baz = array<vec4f, 4>(vec4f(20.0f), vec4f(30.0f), vec4f(50.0f), vec4f(60.0f));
     FragColor += baz[index & 3].z;
 }

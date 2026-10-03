@@ -24,7 +24,6 @@ fn frag_main()
             {
                 discard;
             }
-            break; // unreachable workaround
         }
         default:
         {

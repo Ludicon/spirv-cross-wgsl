@@ -8,8 +8,6 @@ struct SSBO2
     out_data : array<vec4f>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<storage, read> _23 : SSBO;
 @group(0) @binding(1) var<storage, read_write> _33 : SSBO2;
 
@@ -17,7 +15,7 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var _29 : vec4f = _23.in_data[gl_GlobalInvocationID.x];
+    let _29 = _23.in_data[gl_GlobalInvocationID.x];
     _33.out_data[gl_GlobalInvocationID.x] = _29 - _33.out_data[gl_GlobalInvocationID.x] * floor(_29 / _33.out_data[gl_GlobalInvocationID.x]);
     _33.out_data[gl_GlobalInvocationID.x] = bitcast<vec4f>(bitcast<vec4u>(_29) % bitcast<vec4u>(_33.out_data[gl_GlobalInvocationID.x]));
     _33.out_data[gl_GlobalInvocationID.x] = bitcast<vec4f>(bitcast<vec4i>(_29) % bitcast<vec4i>(_33.out_data[gl_GlobalInvocationID.x]));

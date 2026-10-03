@@ -14,8 +14,6 @@ struct SSBO2
     out_data : array<vec4f>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<storage, read> _23 : SSBO;
 @group(0) @binding(1) var<storage, read_write> _38 : SSBO2;
 
@@ -23,11 +21,11 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var ident : u32 = gl_GlobalInvocationID.x;
+    let ident = gl_GlobalInvocationID.x;
     let _32_modf = modf(_23.in_data[ident]);
-    var _32 : ResType = ResType(_32_modf.fract, _32_modf.whole);
-    var i : vec4f = _32._m1;
-    var v : vec4f = _32._m0;
+    let _32 = ResType(_32_modf.fract, _32_modf.whole);
+    let i = _32._m1;
+    let v = _32._m0;
     _38.out_data[ident] = v;
 }
 

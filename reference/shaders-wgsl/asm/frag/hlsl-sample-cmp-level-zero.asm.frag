@@ -8,19 +8,19 @@ var<private> _entryPointOutput : vec4f;
 
 fn _main(texCoords_1 : vec2f, cascadeIndex_1 : f32, fragDepth_1 : f32) -> vec4f
 {
-    var _39 : vec4f = vec4f(vec3f(texCoords_1, cascadeIndex_1), fragDepth_1);
-    var c : f32 = textureSampleCompareLevel(ShadowMap, ShadowSamplerPCF, _39.xy, i32(round(_39.z)), _39.w);
+    let _39 = vec4f(vec3f(texCoords_1, cascadeIndex_1), fragDepth_1);
+    let c = textureSampleCompareLevel(ShadowMap, ShadowSamplerPCF, _39.xy, i32(round(_39.z)), _39.w);
     return vec4f(c, c, c, c);
 }
 
 fn frag_main()
 {
-    var texCoords_1 : vec2f = texCoords;
-    var cascadeIndex_1 : f32 = cascadeIndex;
-    var fragDepth_1 : f32 = fragDepth;
-    var param : vec2f = texCoords_1;
-    var param_1 : f32 = cascadeIndex_1;
-    var param_2 : f32 = fragDepth_1;
+    let texCoords_1 = texCoords;
+    let cascadeIndex_1 = cascadeIndex;
+    let fragDepth_1 = fragDepth;
+    let param = texCoords_1;
+    let param_1 = cascadeIndex_1;
+    let param_2 = fragDepth_1;
     _entryPointOutput = _main(param, param_1, param_2);
 }
 

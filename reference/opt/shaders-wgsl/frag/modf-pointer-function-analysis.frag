@@ -17,11 +17,11 @@ var<private> vo1 : vec4f;
 fn frag_main()
 {
     let _65_modf = modf(v);
-    var _65 : ResType = ResType(_65_modf.fract, _65_modf.whole);
+    let _65 = ResType(_65_modf.fract, _65_modf.whole);
     vo0 = _65._m0;
     vo1 = _65._m1;
     let _73_modf = modf(v.x);
-    var _73 : ResType_1 = ResType_1(_73_modf.fract, _73_modf.whole);
+    let _73 = ResType_1(_73_modf.fract, _73_modf.whole);
     vo0.x += _73._m0;
     vo1.x += _73._m1;
 }

@@ -14,10 +14,10 @@ var<private> fragColor : vec4f;
 
 fn frag_main()
 {
-    var size : f32 = 1.0f / f32(vec2i(textureDimensions(tex, 0)).x);
-    var r : f32 = 0.0f;
-    var d : f32 = dpdx(vertex.x);
-    for (var i : f32 = 0.0f; i < _44.count; i += 1.0f)
+    let size = 1.0f / f32(vec2i(textureDimensions(tex, 0)).x);
+    var r = 0.0f;
+    let d = dpdx(vertex.x);
+    for (var i = 0.0f; i < _44.count; i += 1.0f)
     {
         r += (size * d);
     }

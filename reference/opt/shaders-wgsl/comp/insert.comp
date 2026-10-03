@@ -3,8 +3,6 @@ struct SSBO
     out_data : array<vec4f>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<storage, read_write> _27 : SSBO;
 
 var<private> gl_GlobalInvocationID : vec3u;

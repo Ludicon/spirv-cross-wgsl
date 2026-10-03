@@ -9,10 +9,10 @@ fn _main(vid : u32, iid : u32) -> vec4f
 
 fn vert_main()
 {
-    var vid : u32 = bitcast<u32>(gl_VertexIndex);
-    var iid : u32 = bitcast<u32>(gl_InstanceIndex);
-    var param : u32 = vid;
-    var param_1 : u32 = iid;
+    let vid = bitcast<u32>(gl_VertexIndex);
+    let iid = bitcast<u32>(gl_InstanceIndex);
+    let param = vid;
+    let param_1 = iid;
     gl_Position = _main(param, param_1);
 }
 

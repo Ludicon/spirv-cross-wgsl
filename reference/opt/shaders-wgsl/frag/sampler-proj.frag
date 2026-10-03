@@ -8,7 +8,7 @@ var<private> vTex : vec4f;
 
 fn frag_main()
 {
-    var _17 : vec4f = vTex;
+    var _17 = vTex;
     _17.z = _17.w;
     FragColor = textureSample(uTex, uTex_sampler, _17.xy / _17.z);
 }

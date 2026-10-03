@@ -11,7 +11,7 @@ var<private> vInput : vec4f;
 
 fn frag_main()
 {
-    var frog : bool = false;
+    var frog = false;
     switch (_13.cond)
     {
         case 1:
@@ -24,7 +24,6 @@ fn frag_main()
             {
                 discard;
             }
-            break; // unreachable workaround
         }
         default:
         {

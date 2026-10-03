@@ -22,7 +22,7 @@ fn _main() -> VSOut
 
 fn vert_main()
 {
-    var flattenTemp : VSOut = _main();
+    let flattenTemp = _main();
     _entryPointOutput.a = flattenTemp.a;
     gl_Position = flattenTemp.pos;
 }

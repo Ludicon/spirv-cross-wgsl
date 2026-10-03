@@ -15,8 +15,8 @@ struct _4
 
 fn comp_main()
 {
-    var _22 : vec4i = _5._m0;
-    var _23 : vec4u = _5._m1;
+    let _22 = _5._m0;
+    let _23 = _5._m1;
     _6._m0 = bitcast<vec4u>(bitcast<vec4i>(_23) / _22);
     _6._m0 = bitcast<vec4u>(_22 / bitcast<vec4i>(_23));
     _6._m0 = vec4u(1u);

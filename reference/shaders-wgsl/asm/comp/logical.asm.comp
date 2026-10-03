@@ -39,18 +39,18 @@ fn and_17(a : vec4<bool>, b : vec4<bool>) -> vec4<bool>
 
 fn comp_main()
 {
-    var param : bool = (bitcast<u32>(s0.a) & 0x7fffffffu) == 0x7f800000u;
-    var param_1 : bool = (bitcast<u32>(s1.a) & 0x7fffffffu) > 0x7f800000u;
-    var b0 : bool = and(param, param_1);
-    var param_2 : vec2<bool> = (bitcast<vec2u>(s0.b) & vec2u(0x7fffffffu)) == vec2u(0x7f800000u);
-    var param_3 : vec2<bool> = (bitcast<vec2u>(s1.b) & vec2u(0x7fffffffu)) > vec2u(0x7f800000u);
-    var b1 : vec2<bool> = and_9(param_2, param_3);
-    var param_4 : vec3<bool> = (bitcast<vec3u>(s0.c) & vec3u(0x7fffffffu)) == vec3u(0x7f800000u);
-    var param_5 : vec3<bool> = (bitcast<vec3u>(s1.c) & vec3u(0x7fffffffu)) > vec3u(0x7f800000u);
-    var b2 : vec3<bool> = and_13(param_4, param_5);
-    var param_6 : vec4<bool> = (bitcast<vec4u>(s0.d) & vec4u(0x7fffffffu)) == vec4u(0x7f800000u);
-    var param_7 : vec4<bool> = (bitcast<vec4u>(s1.d) & vec4u(0x7fffffffu)) > vec4u(0x7f800000u);
-    var b3 : vec4<bool> = and_17(param_6, param_7);
+    let param = (bitcast<u32>(s0.a) & 0x7fffffffu) == 0x7f800000u;
+    let param_1 = (bitcast<u32>(s1.a) & 0x7fffffffu) > 0x7f800000u;
+    let b0 = and(param, param_1);
+    let param_2 = (bitcast<vec2u>(s0.b) & vec2u(0x7fffffffu)) == vec2u(0x7f800000u);
+    let param_3 = (bitcast<vec2u>(s1.b) & vec2u(0x7fffffffu)) > vec2u(0x7f800000u);
+    let b1 = and_9(param_2, param_3);
+    let param_4 = (bitcast<vec3u>(s0.c) & vec3u(0x7fffffffu)) == vec3u(0x7f800000u);
+    let param_5 = (bitcast<vec3u>(s1.c) & vec3u(0x7fffffffu)) > vec3u(0x7f800000u);
+    let b2 = and_13(param_4, param_5);
+    let param_6 = (bitcast<vec4u>(s0.d) & vec4u(0x7fffffffu)) == vec4u(0x7f800000u);
+    let param_7 = (bitcast<vec4u>(s1.d) & vec4u(0x7fffffffu)) > vec4u(0x7f800000u);
+    let b3 = and_17(param_6, param_7);
 }
 
 @compute @workgroup_size(1, 1, 1)

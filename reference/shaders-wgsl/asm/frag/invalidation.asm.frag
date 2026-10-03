@@ -4,9 +4,9 @@ var<private> FragColor : f32;
 
 fn frag_main()
 {
-    var a : f32 = v0;
-    var b : f32 = v1;
-    var _16 : f32 = a;
+    var a = v0;
+    let b = v1;
+    let _16 = a;
     a = v1;
     FragColor = (_16 + b) * b;
 }

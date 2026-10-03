@@ -20,7 +20,7 @@ fn frag_main()
     _52 = 0;
     loop
     {
-        var _31 : bool = _52 < _7.uCount;
+        let _31 = _52 < _7.uCount;
         if (_31)
         {
             _54_copy = _54;

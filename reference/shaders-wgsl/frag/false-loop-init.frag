@@ -5,7 +5,7 @@ fn frag_main()
 {
     result = vec4f(0.0f);
     var j : u32;
-    for (var i : i32 = 0; i < 4; i += bitcast<i32>(j))
+    for (var i = 0; i < 4; i += bitcast<i32>(j))
     {
         if (accum.y > 10.0f)
         {

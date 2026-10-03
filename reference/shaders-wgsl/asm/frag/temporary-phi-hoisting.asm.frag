@@ -21,7 +21,7 @@ fn frag_main()
     var _77 : vec3f;
     loop
     {
-        var _69 : bool = _86 < 4;
+        let _69 = _86 < 4;
         if (_69)
         {
             _77 = _85 + _8.g_MyStruct[_86].color.xyz;

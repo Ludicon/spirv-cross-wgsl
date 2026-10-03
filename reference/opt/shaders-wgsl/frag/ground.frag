@@ -23,10 +23,10 @@ var<private> EyeVec : vec3f;
 
 fn frag_main()
 {
-    var _68 : vec3f = normalize((textureSample(TexNormalmap, TexNormalmap_sampler, TexCoord).xyz * 2.0f) - vec3f(1.0f));
-    var _113 : f32 = smoothstep(0.0f, 0.1500000059604644775390625f, (_101.g_CamPos.y + EyeVec.y) * 0.004999999888241291046142578125f);
-    var _125 : f32 = smoothstep(0.699999988079071044921875f, 0.75f, _68.y);
-    var _130 : vec3f = mix(vec3f(0.100000001490116119384765625f), mix(vec3f(0.100000001490116119384765625f, 0.300000011920928955078125f, 0.100000001490116119384765625f), vec3f(0.800000011920928955078125f), vec3f(_113)), vec3f(_125));
+    let _68 = normalize((textureSample(TexNormalmap, TexNormalmap_sampler, TexCoord).xyz * 2.0f) - vec3f(1.0f));
+    let _113 = smoothstep(0.0f, 0.1500000059604644775390625f, (_101.g_CamPos.y + EyeVec.y) * 0.004999999888241291046142578125f);
+    let _125 = smoothstep(0.699999988079071044921875f, 0.75f, _68.y);
+    let _130 = mix(vec3f(0.100000001490116119384765625f), mix(vec3f(0.100000001490116119384765625f, 0.300000011920928955078125f, 0.100000001490116119384765625f), vec3f(0.800000011920928955078125f), vec3f(_113)), vec3f(_125));
     LightingOut = vec4f(0.0f);
     NormalOut = vec4f((_68 * 0.5f) + vec3f(0.5f), 0.0f);
     SpecularOut = vec4f(1.0f - (_125 * _113), 0.0f, 0.0f, 0.0f);

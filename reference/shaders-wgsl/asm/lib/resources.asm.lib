@@ -19,7 +19,7 @@ fn load_block(uv : vec2f, index : u32) -> Block
 {
     var _63 : f32;
     _63 = 0.0f;
-    for (var _66 : u32 = 0u; _66 < index; )
+    for (var _66 = 0u; _66 < index; )
     {
         _63 += _29[_66 & 3u];
         _66++;

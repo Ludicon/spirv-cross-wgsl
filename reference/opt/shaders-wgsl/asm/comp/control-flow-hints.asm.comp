@@ -24,7 +24,7 @@ fn comp_main()
     bar_1._data[13] = foo._data[13];
     bar_1._data[14] = foo._data[14];
     bar_1._data[15] = foo._data[15];
-    for (var _137 : i32 = 0; _137 < 16; )
+    for (var _137 = 0; _137 < 16; )
     {
         bar_1._data[15 - _137] = foo._data[_137];
         _137++;

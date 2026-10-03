@@ -4,7 +4,7 @@ var<private> b : vec4f;
 
 fn frag_main()
 {
-    var _32 : vec4f = (_4 + a) + _4;
+    let _32 = (_4 + a) + _4;
     b = _32;
     b = _4;
     b = _32;

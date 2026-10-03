@@ -14,10 +14,10 @@ fn fu_nc_11(_13 : vec4f) -> vec4f
 
 fn frag_main()
 {
-    var b_1 : vec4f = _4;
-    var _14 : vec4f = (_4 + a) + fu_nc_(b_1);
-    var b_3 : vec4f = a;
-    var b_2 : vec4f = (_4 - a) + fu_nc_11(b_3);
+    let b_1 = _4;
+    let _14 = (_4 + a) + fu_nc_(b_1);
+    let b_3 = a;
+    let b_2 = (_4 - a) + fu_nc_11(b_3);
     b = _14;
     b = b_2;
     b = _14;

@@ -21,10 +21,10 @@ fn GetClip2TexMatrix() -> mat4x4f
 
 fn GetCascade(fragWorldPosition : vec3f) -> i32
 {
-    for (var cascadeIndex : u32 = 0u; cascadeIndex < _16.shadowCascadesNum; cascadeIndex += bitcast<u32>(1))
+    for (var cascadeIndex = 0u; cascadeIndex < _16.shadowCascadesNum; cascadeIndex += bitcast<u32>(1))
     {
-        var worldToShadowMap : mat4x4f = GetClip2TexMatrix() * transpose(_16.lightVP[cascadeIndex]);
-        var fragShadowMapPos : vec4f = worldToShadowMap * vec4f(fragWorldPosition, 1.0f);
+        let worldToShadowMap = GetClip2TexMatrix() * transpose(_16.lightVP[cascadeIndex]);
+        let fragShadowMapPos = worldToShadowMap * vec4f(fragWorldPosition, 1.0f);
         if ((((fragShadowMapPos.z >= 0.0f) && (fragShadowMapPos.z <= 1.0f)) && (max(fragShadowMapPos.x, fragShadowMapPos.y) <= 1.0f)) && (min(fragShadowMapPos.x, fragShadowMapPos.y) >= 0.0f))
         {
             return bitcast<i32>(cascadeIndex);
@@ -35,14 +35,14 @@ fn GetCascade(fragWorldPosition : vec3f) -> i32
 
 fn _main(fragWorld_1 : vec3f) -> i32
 {
-    var param : vec3f = fragWorld_1;
+    let param = fragWorld_1;
     return GetCascade(param);
 }
 
 fn frag_main()
 {
-    var fragWorld_1 : vec3f = fragWorld;
-    var param : vec3f = fragWorld_1;
+    let fragWorld_1 = fragWorld;
+    let param = fragWorld_1;
     _entryPointOutput = _main(param);
 }
 

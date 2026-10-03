@@ -14,7 +14,7 @@ fn sample_texture(tex : texture_2d<f32>, tex_sampler : sampler, uv : vec2f) -> v
 
 fn frag_main()
 {
-    var param : vec2f = vTex;
+    let param = vTex;
     FragColor = vColor * sample_texture(uTex, uTex_sampler, param);
 }
 

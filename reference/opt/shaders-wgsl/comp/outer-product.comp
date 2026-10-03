@@ -18,18 +18,16 @@ struct ReadSSBO
     v4 : vec4f,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<storage, read_write> _21 : SSBO;
 @group(0) @binding(1) var<storage, read> _26 : ReadSSBO;
 
 fn comp_main()
 {
-    var _29 : vec2f = _26.v2;
+    let _29 = _26.v2;
     _21.m22 = mat2x2f(_29 * _29.x, _29 * _29.y);
-    var _38 : vec3f = _26.v3;
+    let _38 = _26.v3;
     _21.m23 = mat2x3f(_38 * _29.x, _38 * _29.y);
-    var _47 : vec4f = _26.v4;
+    let _47 = _26.v4;
     _21.m24 = mat2x4f(_47 * _29.x, _47 * _29.y);
     _21.m32 = mat3x2f(_29 * _38.x, _29 * _38.y, _29 * _38.z);
     _21.m33 = mat3x3f(_38 * _38.x, _38 * _38.y, _38 * _38.z);

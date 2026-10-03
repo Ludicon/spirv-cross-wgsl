@@ -5,8 +5,6 @@ struct SSBO
     data : array<u32>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(8u, 8u, 1u);
-
 @group(0) @binding(0) var<storage, read_write> _14 : SSBO;
 
 var<private> gl_LocalInvocationID : vec3u;

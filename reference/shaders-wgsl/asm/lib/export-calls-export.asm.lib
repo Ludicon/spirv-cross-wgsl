@@ -10,9 +10,9 @@ fn add_three(z : u32) -> u32
 
 fn add_two(y : u32) -> u32
 {
-    var _16 : u32 = y;
-    var _17 : u32 = add_one(_16);
-    var _18 : u32 = add_one(_17);
+    let _16 = y;
+    let _17 = add_one(_16);
+    let _18 = add_one(_17);
     return add_three(_18);
 }
 

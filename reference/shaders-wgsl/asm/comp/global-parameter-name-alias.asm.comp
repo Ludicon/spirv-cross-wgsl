@@ -9,20 +9,20 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn Load(size : u32)
 {
-    var byteAddrTemp : i32 = bitcast<i32>(size >> u32(2));
-    var data : vec4u = vec4u(ssbo_1._data[byteAddrTemp], ssbo_1._data[byteAddrTemp + 1], ssbo_1._data[byteAddrTemp + 2], ssbo_1._data[byteAddrTemp + 3]);
+    let byteAddrTemp = bitcast<i32>(size >> u32(2));
+    let data = vec4u(ssbo_1._data[byteAddrTemp], ssbo_1._data[byteAddrTemp + 1], ssbo_1._data[byteAddrTemp + 2], ssbo_1._data[byteAddrTemp + 3]);
 }
 
 fn _main(id : vec3u)
 {
-    var param : u32 = 4u;
+    let param = 4u;
     Load(param);
 }
 
 fn comp_main()
 {
-    var id : vec3u = gl_GlobalInvocationID;
-    var param : vec3u = id;
+    let id = gl_GlobalInvocationID;
+    let param = id;
     _main(param);
 }
 

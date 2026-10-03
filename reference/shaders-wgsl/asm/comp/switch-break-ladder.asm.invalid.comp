@@ -9,7 +9,7 @@ struct BUF
 
 fn comp_main()
 {
-    var c : i32 = o.a;
+    var c = o.a;
     var a : i32;
     loop
     {

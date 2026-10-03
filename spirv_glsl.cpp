@@ -19741,7 +19741,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 			id = cfg.get_immediate_dominator(id);
 		}
 
-		if (inner_dominator_is_switch)
+		if (inner_dominator_is_switch && backend.unreachable_requires_switch_break)
 			statement("break; // unreachable workaround");
 
 		emit_next_block = false;

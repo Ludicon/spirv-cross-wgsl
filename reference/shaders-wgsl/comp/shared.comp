@@ -8,8 +8,6 @@ struct SSBO2
     out_data : array<f32>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(4u, 1u, 1u);
-
 @group(0) @binding(0) var<storage, read> _22 : SSBO;
 @group(0) @binding(1) var<storage, read_write> _44 : SSBO2;
 
@@ -19,8 +17,8 @@ var<workgroup> sShared : array<f32, 4>;
 
 fn comp_main()
 {
-    var ident : u32 = gl_GlobalInvocationID.x;
-    var idata : f32 = _22.in_data[ident];
+    let ident = gl_GlobalInvocationID.x;
+    let idata = _22.in_data[ident];
     sShared[gl_LocalInvocationIndex] = idata;
     workgroupBarrier();
     _44.out_data[ident] = sShared[(4u - gl_LocalInvocationIndex) - 1u];

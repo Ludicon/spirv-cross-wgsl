@@ -13,7 +13,7 @@ fn frag_main()
     {
         FragColor = 4.0f;
     }
-    for (var _131 : i32 = 0; f32(_131) < (40.0f + vColor); )
+    for (var _131 = 0; f32(_131) < (40.0f + vColor); )
     {
         FragColor += 0.20000000298023223876953125f;
         FragColor += 0.300000011920928955078125f;

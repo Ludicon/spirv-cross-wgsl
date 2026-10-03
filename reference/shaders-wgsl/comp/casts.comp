@@ -8,8 +8,6 @@ struct SSBO0
     inputs : array<vec4i>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(1) var<storage, read_write> _21 : SSBO1;
 @group(0) @binding(0) var<storage, read_write> _27 : SSBO0;
 
@@ -17,7 +15,7 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var ident : u32 = gl_GlobalInvocationID.x;
+    let ident = gl_GlobalInvocationID.x;
     _21.outputs[ident] = select(vec4i(0), vec4i(1), (_27.inputs[ident] & vec4i(3)) != bitcast<vec4i>(vec4u(0u)));
 }
 

@@ -15,12 +15,12 @@ fn frag_main()
     loop
     {
         FragColor = _45;
-        var _22 : bool = _57 < 4;
+        let _22 = _57 < 4;
         if (_22)
         {
             if (v0[_57] > 0.0f)
             {
-                var _43 : vec2f = vec2f(phi);
+                let _43 = vec2f(phi);
                 _57++;
                 phi += 2.0f;
                 _45 = textureSampleLevel(uImage, uImage_sampler, _43, 0.0f);

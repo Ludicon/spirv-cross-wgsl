@@ -15,9 +15,9 @@ fn GetValue_4(_self : EmptyStructTest) -> f32
 
 fn frag_main()
 {
-    var _24 : EmptyStructTest = EmptyStructTest(0);
+    let _24 = EmptyStructTest(0);
     var emptyStruct : EmptyStructTest;
-    var value : f32 = GetValue(emptyStruct);
+    var value = GetValue(emptyStruct);
     value = GetValue_4(_24);
 }
 

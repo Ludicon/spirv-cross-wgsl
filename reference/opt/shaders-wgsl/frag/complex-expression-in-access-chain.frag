@@ -14,7 +14,7 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var _40 : i32 = textureLoad(Buf, vec2i(gl_FragCoord.xy), 0).x % 16;
+    let _40 = textureLoad(Buf, vec2i(gl_FragCoord.xy), 0).x % 16;
     FragColor = (_34.results[_40] + _34.results[_40]) + _34.results[(vIn * vIn) + (vIn2 * vIn2)];
 }
 

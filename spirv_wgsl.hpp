@@ -173,6 +173,7 @@ protected:
 	std::string convert_row_major_matrix(std::string exp_str, const SPIRType &exp_type, uint32_t physical_type_id,
 	                                     bool is_packed, bool relaxed) override;
 	void emit_store_statement(uint32_t lhs_expression, uint32_t rhs_expression) override;
+	std::string declare_temporary(uint32_t result_type, uint32_t result_id) override;
 	std::string convert_half_to_string(const SPIRConstant &value, uint32_t col, uint32_t row) override;
 	std::string convert_float_to_string(const SPIRConstant &value, uint32_t col, uint32_t row) override;
 	std::string non_finite_float_expression(uint32_t bits);
@@ -236,6 +237,8 @@ private:
 	bool member_is_atomic(uint32_t type_id, uint32_t index) const;
 	bool variable_is_atomic(uint32_t var_id) const;
 	void analyze_atomics();
+	void analyze_mutable_temporaries();
+	void analyze_single_store_variables();
 	void analyze_transient_16bit_integers();
 	bool is_16bit_integer_type(uint32_t type_id) const;
 	void mark_atomic_pointer(uint32_t ptr_id);
@@ -264,6 +267,16 @@ private:
 	std::unordered_set<uint64_t> atomic_members;
 	std::unordered_set<uint32_t> atomic_variables;
 
+	// Temporaries which are modified after their declaration, and must be declared with var instead of let.
+	std::unordered_set<uint32_t> mutable_temporaries;
+
+	// Function local variables which are stored exactly once and never escape, which can be declared with let.
+	// Variables passed to functions are only immutable if the callee parameter is passed by value, which is
+	// resolved at emission time, since parameter write counts are computed while emitting the callee.
+	std::unordered_set<uint32_t> single_store_variables;
+	std::unordered_map<uint32_t, SmallVector<std::pair<uint32_t, uint32_t>>> variable_call_arguments;
+	bool variable_can_be_let(uint32_t var_id) const;
+
 	bool requires_inverse_2x2 = false;
 	bool requires_inverse_3x3 = false;
 	bool requires_inverse_4x4 = false;
@@ -273,6 +286,7 @@ private:
 	bool requires_dual_source_blending = false;
 	bool uses_implicit_derivatives = false;
 	bool requires_non_finite_helper = false;
+	bool uses_workgroup_size_constant = false;
 
 	// WGSL has no 16-bit integers. If they are only used as truncated intermediates of int to float conversions,
 	// they are carried in 32-bit integers.

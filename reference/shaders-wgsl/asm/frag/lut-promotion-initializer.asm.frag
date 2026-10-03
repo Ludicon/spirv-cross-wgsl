@@ -6,8 +6,8 @@ var<private> index : i32;
 
 fn frag_main()
 {
-    var foobar : array<vec4f, 4> = _60;
-    var baz : array<vec4f, 4> = _60;
+    var foobar = _60;
+    var baz = _60;
     FragColor = _16[index];
     if (index < 10)
     {

@@ -68,13 +68,13 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var _62 : vec4<bool> = (vA < vB);
-    var _153 : vec4f = (((((((((vA - vB * floor(vA / vB)) + fract(vA)) + inverseSqrt(vA)) + atan2(vA, vB)) + round(vA)) + vec4f(sign(vA.x), reflect(vec2f(vA.y, 0.0f), vec2f(vB.y, 0.0f)).x, refract(vec2f(vA.z, 0.0f), vec2f(vB.z, 0.0f), 0.5f).x, faceForward(vec2f(vA.w, 0.0f), vec2f(vB.w, 0.0f), vec2f(1.0f, 0.0f)).x)) + (((select(vec4f(0.0f), vec4f(1.0f), _62) + select(vec4f(0.0f), vec4f(1.0f), vI != bitcast<vec4i>(vU))) + select(vec4f(0.0f), vec4f(1.0f), (bitcast<vec4u>(vA) & vec4u(0x7fffffffu)) > vec4u(0x7f800000u))) + select(vec4f(0.0f), vec4f(1.0f), (bitcast<vec4u>(vB) & vec4u(0x7fffffffu)) == vec4u(0x7f800000u)))) + ((select(vA, vB, _62) + mix(vA, vB, vec4f(0.25f))) + vec4f(select(0.0f, 1.0f, any(vA > vB))))) + (((vec4f(abs(vI) % vec4i(3)) + vec4f(vU / vec4u(2u))) + vec4f(sign(vI))) + vec4f(min(vI, vec4i(2)) + max(vI, vec4i(-2))))) + (vec4f(clamp(vU, vec4u(1u), vec4u(4u))) + (bitcast<vec4f>(vI) + bitcast<vec4f>(vU)));
+    let _62 = (vA < vB);
+    let _153 = (((((((((vA - vB * floor(vA / vB)) + fract(vA)) + inverseSqrt(vA)) + atan2(vA, vB)) + round(vA)) + vec4f(sign(vA.x), reflect(vec2f(vA.y, 0.0f), vec2f(vB.y, 0.0f)).x, refract(vec2f(vA.z, 0.0f), vec2f(vB.z, 0.0f), 0.5f).x, faceForward(vec2f(vA.w, 0.0f), vec2f(vB.w, 0.0f), vec2f(1.0f, 0.0f)).x)) + (((select(vec4f(0.0f), vec4f(1.0f), _62) + select(vec4f(0.0f), vec4f(1.0f), vI != bitcast<vec4i>(vU))) + select(vec4f(0.0f), vec4f(1.0f), (bitcast<vec4u>(vA) & vec4u(0x7fffffffu)) > vec4u(0x7f800000u))) + select(vec4f(0.0f), vec4f(1.0f), (bitcast<vec4u>(vB) & vec4u(0x7fffffffu)) == vec4u(0x7f800000u)))) + ((select(vA, vB, _62) + mix(vA, vB, vec4f(0.25f))) + vec4f(select(0.0f, 1.0f, any(vA > vB))))) + (((vec4f(abs(vI) % vec4i(3)) + vec4f(vU / vec4u(2u))) + vec4f(sign(vI))) + vec4f(min(vI, vec4i(2)) + max(vI, vec4i(-2))))) + (vec4f(clamp(vU, vec4u(1u), vec4u(4u))) + (bitcast<vec4f>(vI) + bitcast<vec4f>(vU)));
     let _220_modf = modf(vA);
-    var _220 : ResType = ResType(_220_modf.fract, _220_modf.whole);
+    let _220 = ResType(_220_modf.fract, _220_modf.whole);
     let _231_frexp = frexp(vB);
-    var _231 : ResType_1 = ResType_1(_231_frexp.fract, _231_frexp.exp);
-    var _271 : vec4f = (((((_153 + (((spvInverse4x4(_161.m) * vA) + vec4f(spvInverse3x3(_161.m3) * vA.xyz, 0.0f)) + vec4f(spvInverse2x2(mat2x2f(_161.m2[0].xy, _161.m2[1].xy)) * vA.xy, 0.0f, 0.0f))) + ((vec4f(determinant(_161.m) + determinant(_161.m3)) + (transpose(_161.m) * vB)) + (mat4x4f(vA * vB.x, vA * vB.y, vA * vB.z, vA * vB.w) * vA))) + (_220._m0 + _220._m1)) + ((_231._m0 + vec4f(_231._m1)) + ldexp(vA, vec4i(2)))) + ((vec4f(f32(pack4x8snorm(vA) + pack2x16unorm(vB.xy))) + unpack4x8unorm(vU.x)) + vec4f(unpack2x16float(vU.y), 0.0f, 0.0f))) + fma(vA, vB, vA);
+    let _231 = ResType_1(_231_frexp.fract, _231_frexp.exp);
+    let _271 = (((((_153 + (((spvInverse4x4(_161.m) * vA) + vec4f(spvInverse3x3(_161.m3) * vA.xyz, 0.0f)) + vec4f(spvInverse2x2(mat2x2f(_161.m2[0].xy, _161.m2[1].xy)) * vA.xy, 0.0f, 0.0f))) + ((vec4f(determinant(_161.m) + determinant(_161.m3)) + (transpose(_161.m) * vB)) + (mat4x4f(vA * vB.x, vA * vB.y, vA * vB.z, vA * vB.w) * vA))) + (_220._m0 + _220._m1)) + ((_231._m0 + vec4f(_231._m1)) + ldexp(vA, vec4i(2)))) + ((vec4f(f32(pack4x8snorm(vA) + pack2x16unorm(vB.xy))) + unpack4x8unorm(vU.x)) + vec4f(unpack2x16float(vU.y), 0.0f, 0.0f))) + fma(vA, vB, vA);
     FragColor = ((_271 + smoothstep(vA, vB, vec4f(0.5f))) + step(vA, vB)) + pow(abs(vA), vB);
 }
 

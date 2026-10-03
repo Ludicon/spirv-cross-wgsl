@@ -18,8 +18,6 @@ struct ReadSSBO
     v4 : vec4f,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<storage, read_write> _21 : SSBO;
 @group(0) @binding(1) var<storage, read> _26 : ReadSSBO;
 

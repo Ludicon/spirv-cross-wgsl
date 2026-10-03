@@ -6,9 +6,9 @@ var<private> vIn3 : f32;
 
 fn frag_main()
 {
-    var l : vec4<bool> = vec4<bool>(false, true, false, false);
+    let l = vec4<bool>(false, true, false, false);
     FragColor = select(vIn0, vIn1, l);
-    var f : bool = true;
+    let f = true;
     FragColor = vec4f(select(vIn2, vIn3, f));
     FragColor = select(vIn1, vIn0, vec4<bool>(f));
     FragColor = vec4f(select(vIn3, vIn2, f));

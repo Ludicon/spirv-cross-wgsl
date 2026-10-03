@@ -12,7 +12,7 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var c : vec4f = vColor;
+    var c = vColor;
     switch (vMode)
     {
         case 0:
@@ -23,13 +23,13 @@ fn frag_main()
         case 1, 2:
         {
             c += vec4f(1.0f);
-            var _31 : vec4f = c;
+            let _31 = c;
             c = _31.wzyx;
             break;
         }
         case 3:
         {
-            var _31 : vec4f = c;
+            let _31 = c;
             c = _31.wzyx;
             break;
         }
@@ -43,7 +43,7 @@ fn frag_main()
             break;
         }
     }
-    var i : i32 = 0;
+    var i = 0;
     loop
     {
         c.x += 0.100000001490116119384765625f;
@@ -53,13 +53,13 @@ fn frag_main()
             break if !(i < _60.count);
         }
     }
-    var j : i32 = 0;
-    var k : i32 = 10;
+    var j = 0;
+    var k = 10;
     loop
     {
-        var _74 : i32 = j;
-        var _75 : i32 = k;
-        var _76 : bool = _74 < _75;
+        let _74 = j;
+        let _75 = k;
+        let _76 = _74 < _75;
         if (_76)
         {
             c.y += f32(j * k);
@@ -72,7 +72,7 @@ fn frag_main()
             break;
         }
     }
-    for (var j_1 : i32 = 0; j_1 < _60.count; j_1++)
+    for (var j_1 = 0; j_1 < _60.count; j_1++)
     {
         if (j_1 == _60.limit)
         {
@@ -82,7 +82,7 @@ fn frag_main()
         {
             continue;
         }
-        for (var k_1 : i32 = 0; k_1 < _60.count; k_1++)
+        for (var k_1 = 0; k_1 < _60.count; k_1++)
         {
             switch (k_1)
             {

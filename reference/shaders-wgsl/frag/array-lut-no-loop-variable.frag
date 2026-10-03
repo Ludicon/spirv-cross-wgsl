@@ -5,11 +5,11 @@ var<private> v0 : vec4f;
 
 fn frag_main()
 {
-    var i : i32 = 0;
+    var i = 0;
     loop
     {
-        var _27 : i32 = i;
-        var _30 : bool = _27 < 4;
+        let _27 = i;
+        let _30 = _27 < 4;
         if (_30)
         {
             i++;

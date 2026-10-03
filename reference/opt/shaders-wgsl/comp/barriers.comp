@@ -1,5 +1,3 @@
-const gl_WorkGroupSize : vec3u = vec3u(4u, 1u, 1u);
-
 fn comp_main()
 {
     workgroupBarrier();

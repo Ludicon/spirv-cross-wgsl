@@ -20,8 +20,8 @@ fn sample_shadow(t : texture_depth_2d, s : sampler_comparison, uvz : vec3f) -> f
 
 fn frag_main()
 {
-    var param : vec2f = vUV;
-    var param_1 : vec3f = vec3f(vUV, 0.5f);
+    let param = vUV;
+    let param_1 = vec3f(vUV, 0.5f);
     FragColor = sample_texture(uTexture, uSampler, param) * sample_shadow(uDepth, uShadowSampler, param_1);
     FragColor += textureLoad(uTexture, vec2i(vUV), 0);
 }

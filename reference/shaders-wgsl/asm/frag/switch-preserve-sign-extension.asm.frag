@@ -1,7 +1,7 @@
 fn frag_main()
 {
-    var sw : i32 = 42;
-    var result : i32 = 0;
+    let sw = 42;
+    var result = 0;
     switch (sw)
     {
         case -42:

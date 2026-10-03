@@ -36,27 +36,27 @@ fn Resolve(Albedo : vec3f, Normal : vec3f, Roughness : f32, Metallic : f32)
 
 fn frag_main()
 {
-    var Normal : vec3f = (textureSample(TexNormalmap, TexNormalmap_sampler, TexCoord).xyz * 2.0f) - vec3f(1.0f);
+    var Normal = (textureSample(TexNormalmap, TexNormalmap_sampler, TexCoord).xyz * 2.0f) - vec3f(1.0f);
     Normal = normalize(Normal);
-    var param : f32 = length(EyeVec) / 1000.0f;
+    let param = length(EyeVec) / 1000.0f;
     var scatter_uv : vec2f;
     scatter_uv.x = _saturate(param);
-    var nEye : vec3f = normalize(EyeVec);
+    let nEye = normalize(EyeVec);
     scatter_uv.y = 0.0f;
-    var Color : vec3f = vec3f(0.100000001490116119384765625f, 0.300000011920928955078125f, 0.100000001490116119384765625f);
-    var grass : vec3f = vec3f(0.100000001490116119384765625f, 0.300000011920928955078125f, 0.100000001490116119384765625f);
-    var dirt : vec3f = vec3f(0.100000001490116119384765625f);
-    var snow : vec3f = vec3f(0.800000011920928955078125f);
-    var grass_snow : f32 = smoothstep(0.0f, 0.1500000059604644775390625f, (_101.g_CamPos.y + EyeVec.y) / 200.0f);
-    var base : vec3f = mix(grass, snow, vec3f(grass_snow));
-    var edge : f32 = smoothstep(0.699999988079071044921875f, 0.75f, Normal.y);
+    var Color = vec3f(0.100000001490116119384765625f, 0.300000011920928955078125f, 0.100000001490116119384765625f);
+    let grass = vec3f(0.100000001490116119384765625f, 0.300000011920928955078125f, 0.100000001490116119384765625f);
+    let dirt = vec3f(0.100000001490116119384765625f);
+    let snow = vec3f(0.800000011920928955078125f);
+    let grass_snow = smoothstep(0.0f, 0.1500000059604644775390625f, (_101.g_CamPos.y + EyeVec.y) / 200.0f);
+    let base = mix(grass, snow, vec3f(grass_snow));
+    let edge = smoothstep(0.699999988079071044921875f, 0.75f, Normal.y);
     Color = mix(dirt, base, vec3f(edge));
     Color *= Color;
-    var Roughness : f32 = 1.0f - (edge * grass_snow);
-    var param_1 : vec3f = Color;
-    var param_2 : vec3f = Normal;
-    var param_3 : f32 = Roughness;
-    var param_4 : f32 = 0.0f;
+    let Roughness = 1.0f - (edge * grass_snow);
+    let param_1 = Color;
+    let param_2 = Normal;
+    let param_3 = Roughness;
+    let param_4 = 0.0f;
     Resolve(param_1, param_2, param_3, param_4);
 }
 

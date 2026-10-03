@@ -18,8 +18,8 @@ fn resolve(f : Foobar) -> vec4f
 
 fn frag_main()
 {
-    var param : Foobar = Foobar(10.0f, 20.0f);
-    var param_1 : Foobar = _75[index];
+    let param = Foobar(10.0f, 20.0f);
+    let param_1 = _75[index];
     FragColor = ((_37[index] + _55[index][index + 1]) + resolve(param)) + resolve(param_1);
 }
 

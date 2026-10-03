@@ -6,11 +6,11 @@ var<private> vColor : vec4f;
 
 fn vert_main()
 {
-    var _20 : vec4f = vInput1 * vInput2;
-    var _21 : vec4f = vInput0 + _20;
+    let _20 = vInput1 * vInput2;
+    let _21 = vInput0 + _20;
     gl_Position = _21;
-    var _27 : vec4f = vInput0 - vInput1;
-    var _29 : vec4f = _27 * vInput2;
+    let _27 = vInput0 - vInput1;
+    let _29 = _27 * vInput2;
     vColor = _29;
 }
 

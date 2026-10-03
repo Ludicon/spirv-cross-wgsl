@@ -16,7 +16,7 @@ fn frag_main()
     {
         FragColor += _16[index & 1];
     }
-    var _63 : bool = index > 30;
+    let _63 = index > 30;
     if (_63)
     {
         FragColor += _60[index & 3].y;
@@ -25,12 +25,12 @@ fn frag_main()
     {
         FragColor += _60[index & 1].x;
     }
-    var foobar : array<vec4f, 4> = _60;
+    var foobar = _60;
     if (_63)
     {
         foobar[1].z = 20.0f;
     }
-    var _91 : i32 = index & 3;
+    let _91 = index & 3;
     FragColor += foobar[_91].z;
     FragColor += _104[_91].z;
 }

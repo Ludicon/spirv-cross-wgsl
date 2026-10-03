@@ -114,8 +114,6 @@ struct SSBO0
     _array : array<vec4f>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(1) var<storage, read_write> ssbo_430 : SSBO1;
 @group(0) @binding(0) var<storage, read_write> ssbo_140 : SSBO0;
 

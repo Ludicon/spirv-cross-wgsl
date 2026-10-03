@@ -13,7 +13,7 @@ fn func()
     {
         FragColor = 4.0f;
     }
-    for (var i : i32 = 0; f32(i) < (40.0f + vColor); i += (i32(vColor) + 5))
+    for (var i = 0; f32(i) < (40.0f + vColor); i += (i32(vColor) + 5))
     {
         FragColor += 0.20000000298023223876953125f;
         FragColor += 0.300000011920928955078125f;

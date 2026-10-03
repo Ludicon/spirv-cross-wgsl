@@ -4,9 +4,9 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    for (var _46 : i32 = 0; _46 < 4; )
+    for (var _46 = 0; _46 < 4; )
     {
-        var _33 : i32 = _46 + 1;
+        let _33 = _46 + 1;
         FragColor += vec4f(_17[_33]);
         _46 = _33;
         continue;

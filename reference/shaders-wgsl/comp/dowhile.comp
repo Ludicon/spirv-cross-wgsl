@@ -9,8 +9,6 @@ struct SSBO2
     out_data : array<vec4f>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<storage, read> _28 : SSBO;
 @group(0) @binding(1) var<storage, read_write> _52 : SSBO2;
 
@@ -19,9 +17,9 @@ var<private> i : i32;
 
 fn comp_main()
 {
-    var ident : u32 = gl_GlobalInvocationID.x;
+    let ident = gl_GlobalInvocationID.x;
     i = 0;
-    var idat : vec4f = _28.in_data[ident];
+    var idat = _28.in_data[ident];
     loop
     {
         idat = _28.mvp * idat;

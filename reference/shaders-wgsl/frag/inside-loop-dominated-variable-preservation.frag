@@ -2,13 +2,13 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var written : bool = false;
+    var written = false;
     var v : f32;
-    for (var j : i32 = 0; j < 10; j++)
+    for (var j = 0; j < 10; j++)
     {
-        for (var i : i32 = 0; i < 4; i++)
+        for (var i = 0; i < 4; i++)
         {
-            var w : f32 = 0.0f;
+            var w = 0.0f;
             if (written)
             {
                 w += v;

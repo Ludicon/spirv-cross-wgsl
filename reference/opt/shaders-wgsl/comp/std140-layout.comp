@@ -23,8 +23,6 @@ struct SSBO
     result : vec4f,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<uniform> ubo : UBO;
 @group(0) @binding(1) var<storage, read_write> ssbo : SSBO;
 
@@ -32,13 +30,13 @@ fn comp_main()
 {
     var _140 : f32;
     _140 = 0.0f;
-    for (var _139 : i32 = 0; _139 < ubo.count; )
+    for (var _139 = 0; _139 < ubo.count; )
     {
         _140 += ((ubo.weights[_139].x * ubo.offsets[_139 % 3].y) + ubo.items[_139 & 1].weight);
         _139++;
         continue;
     }
-    var _101 : vec4f = ((vec4f((mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy) * vec2f(_140)) + (mat3x2f(ubo.m32[1][0].xy, ubo.m32[1][1].xy, ubo.m32[1][2].xy) * vec3f(1.0f)), 0.0f, 1.0f) * ubo.rm) + vec4f(ubo.rm[0][1], ubo.rm[1][1], ubo.rm[2][1], ubo.rm[3][1])) + vec4f(ubo.rm[3u][2]);
+    let _101 = ((vec4f((mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy) * vec2f(_140)) + (mat3x2f(ubo.m32[1][0].xy, ubo.m32[1][1].xy, ubo.m32[1][2].xy) * vec3f(1.0f)), 0.0f, 1.0f) * ubo.rm) + vec4f(ubo.rm[0][1], ubo.rm[1][1], ubo.rm[2][1], ubo.rm[3][1])) + vec4f(ubo.rm[3u][2]);
     ssbo.out_weights[1].x = _140;
     ssbo.out_m2[0][0] = mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy)[0][0];
     ssbo.out_m2[0][1] = mat2x2f(ubo.m2[0].xy, ubo.m2[1].xy)[0][1];

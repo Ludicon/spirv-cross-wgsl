@@ -12,7 +12,7 @@ fn frag_main()
 {
     var _122 : vec4f;
     _122 = vec4f(0.0f);
-    for (var _121 : i32 = -2; _121 <= 2; )
+    for (var _121 = -2; _121 <= 2; )
     {
         _122 += textureSample(uTex, uTex_sampler, (vUV + vec2f(f32(_121) * 0.00999999977648258209228515625f, 0.0f)));
         _121++;

@@ -16,7 +16,7 @@ fn frag_main()
     var _54_copy : i32;
     _54 = _7.uK;
     _53 = _7.uJ;
-    for (var _52 : i32 = 0; _52 < _7.uCount; )
+    for (var _52 = 0; _52 < _7.uCount; )
     {
         _54_copy = _54;
         _54 = _53;

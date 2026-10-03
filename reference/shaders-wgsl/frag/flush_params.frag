@@ -14,13 +14,13 @@ fn foo() -> Structy
 {
     var param : Structy;
     foo2(&param);
-    var f : Structy = param;
+    let f = param;
     return f;
 }
 
 fn frag_main()
 {
-    var s : Structy = foo();
+    let s = foo();
     FragColor = s.c;
 }
 

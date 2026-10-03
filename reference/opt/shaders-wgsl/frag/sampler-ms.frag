@@ -6,7 +6,7 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var _17 : vec2i = vec2i(gl_FragCoord.xy);
+    let _17 = vec2i(gl_FragCoord.xy);
     FragColor = ((textureLoad(uSampler, _17, 0) + textureLoad(uSampler, _17, 1)) + textureLoad(uSampler, _17, 2)) + textureLoad(uSampler, _17, 3);
 }
 

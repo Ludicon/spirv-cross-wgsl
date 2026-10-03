@@ -5,11 +5,11 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var _161 : vec4f = vColor * 2.0f;
-    var _166 : f32 = _161.x + _161.y;
+    let _161 = vColor * 2.0f;
+    let _166 = _161.x + _161.y;
     var _220 : f32;
     _220 = 0.0f;
-    for (var _219 : i32 = 0; _219 < 4; )
+    for (var _219 = 0; _219 < 4; )
     {
         _220 += _49[_219];
         _219++;

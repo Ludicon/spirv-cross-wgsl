@@ -6,7 +6,7 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var i : i32 = 0;
+    var i = 0;
     var phi : f32;
     var _45 : vec4f;
     phi = 1.0f;
@@ -18,7 +18,7 @@ fn frag_main()
         {
             if (v0[i] > 0.0f)
             {
-                var _43 : vec2f = vec2f(phi);
+                let _43 = vec2f(phi);
                 i++;
                 phi += 2.0f;
                 _45 = textureSampleLevel(uImage, uImage_sampler, _43, 0.0f);

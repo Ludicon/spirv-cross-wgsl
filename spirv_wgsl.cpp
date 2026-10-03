@@ -93,6 +93,8 @@ string CompilerWGSL::compile()
 	backend.support_complex_for_loop = false;
 	backend.int32_min_literal = "i32(-2147483648)";
 	backend.strip_condition_parentheses = true;
+	// Switch cases never fall through in WGSL, reaching the end of a case exits the switch.
+	backend.unreachable_requires_switch_break = false;
 
 	auto &execution = get_entry_point();
 	if (execution.model != ExecutionModelVertex && execution.model != ExecutionModelFragment &&
@@ -133,6 +135,8 @@ string CompilerWGSL::compile()
 	update_active_builtins();
 	analyze_image_and_sampler_usage();
 	analyze_atomics();
+	analyze_mutable_temporaries();
+	analyze_single_store_variables();
 	analyze_transient_16bit_integers();
 	prepare_buffer_layouts();
 
@@ -1210,21 +1214,27 @@ string CompilerWGSL::variable_decl(const SPIRVariable &variable)
 
 	string type_name = variable_is_atomic(variable.self) ? wrap_atomic(type, type_to_glsl(type, variable.self)) :
 	                                                       type_to_glsl(type, variable.self);
-	auto res = join("var", space, " ", to_name(variable.self), " : ", type_name);
-
+	string initializer;
 	if (variable.loop_variable && variable.static_expression)
 	{
 		uint32_t expr = variable.static_expression;
 		if (ir.ids[expr].get_type() != TypeUndef)
-			res += join(" = ", to_unpacked_expression(variable.static_expression));
+			initializer = to_unpacked_expression(variable.static_expression);
 	}
 	else if (variable.initializer && variable.storage != StorageClassWorkgroup)
 	{
 		uint32_t expr = variable.initializer;
 		if (ir.ids[expr].get_type() != TypeUndef)
-			res += join(" = ", to_initializer_expression(variable));
+			initializer = to_initializer_expression(variable);
 	}
 
+	// Function local variables infer their type from the initializer. Module scope declarations keep it.
+	if (!initializer.empty() && variable.storage == StorageClassFunction)
+		return join("var ", to_name(variable.self), " = ", initializer);
+
+	auto res = join("var", space, " ", to_name(variable.self), " : ", type_name);
+	if (!initializer.empty())
+		res += join(" = ", initializer);
 	return res;
 }
 
@@ -1277,6 +1287,7 @@ string CompilerWGSL::builtin_to_glsl(BuiltIn builtin, StorageClass storage)
 			if (c.specialization)
 				return constant_expression(c);
 		}
+		require_enable(uses_workgroup_size_constant);
 		return "gl_WorkGroupSize";
 	}
 	case BuiltInSubgroupSize:
@@ -1547,6 +1558,161 @@ void CompilerWGSL::emit_sampled_image_op(uint32_t result_type, uint32_t result_i
 static inline uint64_t atomic_member_key(uint32_t type_id, uint32_t index)
 {
 	return (uint64_t(type_id) << 32) | index;
+}
+
+void CompilerWGSL::analyze_mutable_temporaries()
+{
+	// SPIR-V values are immutable, so temporaries can be declared with let, except when the GLSL backend
+	// implements a composite insert by copying the composite to a temporary and modifying it, or by
+	// modifying the inserted-into composite in place.
+	mutable_temporaries.clear();
+	for (auto &id : ir.ids)
+	{
+		if (id.get_type() != TypeFunction)
+			continue;
+		auto &func = id.get<SPIRFunction>();
+		for (auto block_id : func.blocks)
+		{
+			for (auto &i : get<SPIRBlock>(block_id).ops)
+			{
+				auto *ops = stream(i);
+				auto op = static_cast<Op>(i.op);
+				if (op == OpCompositeInsert)
+				{
+					mutable_temporaries.insert(ops[1]);
+					mutable_temporaries.insert(ops[3]);
+				}
+				else if (op == OpVectorInsertDynamic)
+				{
+					mutable_temporaries.insert(ops[1]);
+					mutable_temporaries.insert(ops[2]);
+				}
+			}
+		}
+	}
+}
+
+void CompilerWGSL::analyze_single_store_variables()
+{
+	// A function local variable can be declared with let at its first store if that store is the only write,
+	// and the variable never escapes, i.e. it is only read with OpLoad, either directly or through access chains.
+	single_store_variables.clear();
+	variable_call_arguments.clear();
+	for (auto &id : ir.ids)
+	{
+		if (id.get_type() != TypeFunction)
+			continue;
+		auto &func = id.get<SPIRFunction>();
+
+		unordered_map<uint32_t, uint32_t> store_counts;
+		unordered_set<uint32_t> escaped;
+		for (auto var_id : func.local_variables)
+			store_counts[var_id] = 0;
+
+		// Pointers derived from a local variable through access chains.
+		unordered_map<uint32_t, uint32_t> derived;
+		auto base_variable = [&](uint32_t ptr) -> uint32_t {
+			if (store_counts.count(ptr))
+				return ptr;
+			auto itr = derived.find(ptr);
+			return itr != derived.end() ? itr->second : 0;
+		};
+
+		for (auto block_id : func.blocks)
+		{
+			for (auto &i : get<SPIRBlock>(block_id).ops)
+			{
+				auto *ops = stream(i);
+				auto op = static_cast<Op>(i.op);
+				switch (op)
+				{
+				case OpLoad:
+					break;
+
+				case OpAccessChain:
+				case OpInBoundsAccessChain:
+					if (uint32_t base = base_variable(ops[2]))
+						derived[ops[1]] = base;
+					// Indices may reference variables too, e.g. by mistake, so check them conservatively.
+					for (uint32_t j = 3; j < i.length; j++)
+						if (uint32_t base = base_variable(ops[j]))
+							escaped.insert(base);
+					break;
+
+				case OpFunctionCall:
+					for (uint32_t j = 3; j < i.length; j++)
+					{
+						// Only whole variables can be passed by value, see to_func_call_arg().
+						if (store_counts.count(ops[j]))
+							variable_call_arguments[ops[j]].push_back({ ops[2], j - 3 });
+						else if (uint32_t base = base_variable(ops[j]))
+							escaped.insert(base);
+					}
+					break;
+
+				case OpStore:
+					if (store_counts.count(ops[0]))
+						store_counts[ops[0]]++;
+					else if (uint32_t base = base_variable(ops[0]))
+						escaped.insert(base); // Partial writes through an access chain.
+					if (uint32_t base = base_variable(ops[1]))
+						escaped.insert(base);
+					break;
+
+				default:
+					// Any other use (function calls, atomics, OpCopyMemory, extended instructions with
+					// pointer arguments, ...) may write to the variable. Literals which happen to alias
+					// a variable ID only make this conservative.
+					for (uint32_t j = 0; j < i.length; j++)
+						if (uint32_t base = base_variable(ops[j]))
+							escaped.insert(base);
+					break;
+				}
+			}
+		}
+
+		for (auto &count : store_counts)
+		{
+			auto &var = get<SPIRVariable>(count.first);
+			if (count.second == 1 && !escaped.count(count.first) && !var.phi_variable && !var.loop_variable &&
+			    !var.initializer)
+				single_store_variables.insert(count.first);
+		}
+	}
+}
+
+bool CompilerWGSL::variable_can_be_let(uint32_t var_id) const
+{
+	if (!single_store_variables.count(var_id))
+		return false;
+
+	auto itr = variable_call_arguments.find(var_id);
+	if (itr == variable_call_arguments.end())
+		return true;
+
+	// Callees are emitted before their callers, so parameter write counts are known here.
+	for (auto &call : itr->second)
+	{
+		auto &callee = get<SPIRFunction>(call.first);
+		if (call.second >= callee.arguments.size() || is_pointer_parameter(callee.arguments[call.second]))
+			return false;
+	}
+	return true;
+}
+
+string CompilerWGSL::declare_temporary(uint32_t result_type, uint32_t result_id)
+{
+	// Temporaries declared in continue blocks are hoisted to the loop header, and hoisted temporaries
+	// are assigned rather than declared. The base class handles both.
+	bool hoisted = (!block_temporary_hoisting && current_continue_block && !hoisted_temporaries.count(result_id)) ||
+	               hoisted_temporaries.count(result_id);
+	if (hoisted)
+		return CompilerGLSL::declare_temporary(result_type, result_id);
+
+	// The type is inferred from the initializer, but make sure it is representable in WGSL.
+	type_to_glsl(get<SPIRType>(result_type));
+	add_local_variable_name(result_id);
+	return join(mutable_temporaries.count(result_id) ? "var " : "let ", to_name(result_id), " = ");
 }
 
 bool CompilerWGSL::is_16bit_integer_type(uint32_t type_id) const
@@ -2015,6 +2181,22 @@ string CompilerWGSL::convert_row_major_matrix(string exp_str, const SPIRType &ex
 
 void CompilerWGSL::emit_store_statement(uint32_t lhs_expression, uint32_t rhs_expression)
 {
+	// A function local variable declared by its first store infers its type from the stored value.
+	auto *var = maybe_get<SPIRVariable>(lhs_expression);
+	if (var && var->deferred_declaration && var->storage == StorageClassFunction && !variable_is_atomic(var->self))
+	{
+		auto rhs = to_pointer_expression(rhs_expression);
+		if (!rhs.empty())
+		{
+			// The type is inferred, but make sure it is representable in WGSL.
+			type_to_glsl(get_variable_data_type(*var), var->self);
+			var->deferred_declaration = false;
+			statement(variable_can_be_let(var->self) ? "let " : "var ", to_name(var->self), " = ", rhs, ";");
+			register_write(lhs_expression);
+			return;
+		}
+	}
+
 	auto *e = maybe_get<SPIRExpression>(lhs_expression);
 	bool need_transpose = e && e->need_transpose;
 	uint32_t physical = get_extended_decoration(lhs_expression, SPIRVCrossDecorationPhysicalTypeID);
@@ -2264,7 +2446,8 @@ void CompilerWGSL::emit_constants_and_structs()
 			if (c.self == workgroup_size_id)
 			{
 				// If the workgroup size is specialized, it is an override-expression and is emitted inline.
-				if (!c.specialization)
+				// Otherwise only declare it if the shader actually references it.
+				if (!c.specialization && uses_workgroup_size_constant)
 				{
 					statement("const gl_WorkGroupSize : vec3u = ", constant_expression(c), ";");
 					emitted = true;
@@ -4103,6 +4286,9 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 	case OpEmitStreamVertex:
 	case OpEndStreamPrimitive:
 		SPIRV_CROSS_THROW("Geometry shaders are not supported in WGSL.");
+
+	case OpReadClockKHR:
+		SPIRV_CROSS_THROW("Shader clocks are not supported in WGSL.");
 
 	case OpIsHelperInvocationEXT:
 		SPIRV_CROSS_THROW("Helper invocation queries are not supported in WGSL.");

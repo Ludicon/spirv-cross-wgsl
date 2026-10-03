@@ -5,8 +5,6 @@ struct SSBO
     data : array<f32>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(64u, 1u, 1u);
-
 @group(0) @binding(0) var<storage, read_write> ssbo : SSBO;
 
 var<private> gl_GlobalInvocationID : vec3u;
@@ -15,16 +13,16 @@ var<private> gl_SubgroupInvocationID : u32;
 
 fn comp_main()
 {
-    var v : f32 = ssbo.data[gl_GlobalInvocationID.x];
-    var sum : f32 = subgroupAdd(v);
-    var prefix : f32 = subgroupExclusiveAdd(v);
-    var m : f32 = subgroupMax(v);
-    var first : f32 = subgroupBroadcastFirst(v);
-    var _42 : f32 = subgroupShuffleXor(v, 1u);
-    var shuffled : f32 = _42;
-    var ballot : vec4u = subgroupBallot(v > 0.0f);
-    var all_positive : bool = subgroupAll(v > 0.0f);
-    var _56 : bool = subgroupElect();
+    let v = ssbo.data[gl_GlobalInvocationID.x];
+    let sum = subgroupAdd(v);
+    let prefix = subgroupExclusiveAdd(v);
+    let m = subgroupMax(v);
+    let first = subgroupBroadcastFirst(v);
+    let _42 = subgroupShuffleXor(v, 1u);
+    let shuffled = _42;
+    let ballot = subgroupBallot(v > 0.0f);
+    let all_positive = subgroupAll(v > 0.0f);
+    let _56 = subgroupElect();
     if (_56)
     {
         ssbo.data[0] = sum;

@@ -13,7 +13,7 @@ struct Buf
 
 fn _main()
 {
-    var _25 : i32 = atomicAdd(&Buf_count_1._count, 1);
+    let _25 = atomicAdd(&Buf_count_1._count, 1);
     Buf_1._data[_25] = vec4f(1.0f);
 }
 

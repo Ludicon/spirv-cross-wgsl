@@ -9,7 +9,7 @@ var<private> FooOut : f32;
 
 fn frag_main()
 {
-    var _19 : SwizzleTest = SwizzleTest(foo.x, foo.y);
+    let _19 = SwizzleTest(foo.x, foo.y);
     FooOut = _19.a + _19.b;
 }
 

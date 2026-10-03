@@ -29,25 +29,25 @@ var<private> FragColor : f32;
 fn frag_main()
 {
     let _16_frexp = frexp(v0);
-    var _16 : ResType = ResType(_16_frexp.fract, _16_frexp.exp);
-    var e0 : i32 = _16._m1;
-    var f0 : f32 = _16._m0;
+    let _16 = ResType(_16_frexp.fract, _16_frexp.exp);
+    var e0 = _16._m1;
+    var f0 = _16._m0;
     let _22_frexp = frexp(v0 + 1.0f);
-    var _22 : ResType = ResType(_22_frexp.fract, _22_frexp.exp);
+    let _22 = ResType(_22_frexp.fract, _22_frexp.exp);
     e0 = _22._m1;
     f0 = _22._m0;
     let _35_frexp = frexp(v1);
-    var _35 : ResType_1 = ResType_1(_35_frexp.fract, _35_frexp.exp);
-    var e1 : vec2i = _35._m1;
-    var f1 : vec2f = _35._m0;
+    let _35 = ResType_1(_35_frexp.fract, _35_frexp.exp);
+    let e1 = _35._m1;
+    let f1 = _35._m0;
     let _42_modf = modf(v0);
-    var _42 : ResType_2 = ResType_2(_42_modf.fract, _42_modf.whole);
-    var r0 : f32 = _42._m1;
-    var m0 : f32 = _42._m0;
+    let _42 = ResType_2(_42_modf.fract, _42_modf.whole);
+    let r0 = _42._m1;
+    let m0 = _42._m0;
     let _49_modf = modf(v1);
-    var _49 : ResType_3 = ResType_3(_49_modf.fract, _49_modf.whole);
-    var r1 : vec2f = _49._m1;
-    var m1 : vec2f = _49._m0;
+    let _49 = ResType_3(_49_modf.fract, _49_modf.whole);
+    let r1 = _49._m1;
+    let m1 = _49._m0;
     FragColor = ((((f0 + f1.x) + f1.y) + m0) + m1.x) + m1.y;
 }
 

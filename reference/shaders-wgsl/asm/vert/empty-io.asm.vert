@@ -28,7 +28,7 @@ fn vert_main()
 {
     var _input : VSInput;
     _input.position = position;
-    var param : VSInput = _input;
+    let param = _input;
     gl_Position = _main(param).position;
 }
 

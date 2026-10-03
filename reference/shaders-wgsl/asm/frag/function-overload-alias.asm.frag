@@ -22,14 +22,14 @@ fn foo_14(foo_1 : vec2f) -> vec4f
 
 fn frag_main()
 {
-    var foo_2 : vec4f = vec4f(1.0f);
-    var foo_1 : vec4f = foo(foo_2);
-    var foo_4 : vec3f = vec3f(1.0f);
-    var foo_3 : vec4f = foo_8(foo_4);
-    var foo_6 : vec4f = vec4f(1.0f);
-    var foo_5 : vec4f = foo_11(foo_6);
-    var foo_9 : vec2f = vec2f(1.0f);
-    var foo_7 : vec4f = foo_14(foo_9);
+    let foo_2 = vec4f(1.0f);
+    let foo_1 = foo(foo_2);
+    let foo_4 = vec3f(1.0f);
+    let foo_3 = foo_8(foo_4);
+    let foo_6 = vec4f(1.0f);
+    let foo_5 = foo_11(foo_6);
+    let foo_9 = vec2f(1.0f);
+    let foo_7 = foo_14(foo_9);
     FragColor = ((foo_1 + foo_3) + foo_5) + foo_7;
 }
 

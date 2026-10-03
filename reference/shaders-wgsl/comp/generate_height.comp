@@ -13,8 +13,6 @@ struct HeightmapFFT
     heights : array<u32>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(64u, 1u, 1u);
-
 @group(0) @binding(0) var<storage, read> _137 : Distribution;
 @group(0) @binding(2) var<uniform> _166 : UBO;
 @group(0) @binding(1) var<storage, read_write> _225 : HeightmapFFT;
@@ -52,11 +50,11 @@ fn _alias(i : vec2f, N : vec2f) -> vec2f
 
 fn cmul(a : vec2f, b : vec2f) -> vec2f
 {
-    var r3 : vec2f = a.yx;
-    var r1 : vec2f = b.xx;
-    var R0 : vec2f = a * r1;
-    var r2 : vec2f = b.yy;
-    var R1 : vec2f = r2 * r3;
+    let r3 = a.yx;
+    let r1 = b.xx;
+    let R0 = a * r1;
+    let r2 = b.yy;
+    let R1 = r2 * r3;
     return R0 + vec2f(-R1.x, R1.y);
 }
 
@@ -67,30 +65,30 @@ fn pack2(v : vec2f) -> u32
 
 fn generate_heightmap()
 {
-    var N : vec2u = vec2u(64u, 1u) * gl_NumWorkGroups.xy;
-    var i : vec2u = gl_GlobalInvocationID.xy;
-    var param : vec2u = N - i;
-    var param_1 : vec2u = vec2u(0u);
-    var param_2 : vec2<bool> = i == vec2u(0u);
-    var wi : vec2u = workaround_mix(param, param_1, param_2);
-    var a : vec2f = _137.distribution[(i.y * N.x) + i.x];
-    var b : vec2f = _137.distribution[(wi.y * N.x) + wi.x];
-    var param_3 : vec2f = vec2f(i);
-    var param_4 : vec2f = vec2f(N);
-    var k : vec2f = _166.uModTime.xy * _alias(param_3, param_4);
-    var k_len : f32 = length(k);
-    var w : f32 = sqrt(9.81000041961669921875f * k_len) * _166.uModTime.z;
-    var cw : f32 = cos(w);
-    var sw : f32 = sin(w);
-    var param_5 : vec2f = a;
-    var param_6 : vec2f = vec2f(cw, sw);
+    let N = vec2u(64u, 1u) * gl_NumWorkGroups.xy;
+    let i = gl_GlobalInvocationID.xy;
+    let param = N - i;
+    let param_1 = vec2u(0u);
+    let param_2 = i == vec2u(0u);
+    let wi = workaround_mix(param, param_1, param_2);
+    var a = _137.distribution[(i.y * N.x) + i.x];
+    var b = _137.distribution[(wi.y * N.x) + wi.x];
+    let param_3 = vec2f(i);
+    let param_4 = vec2f(N);
+    let k = _166.uModTime.xy * _alias(param_3, param_4);
+    let k_len = length(k);
+    let w = sqrt(9.81000041961669921875f * k_len) * _166.uModTime.z;
+    let cw = cos(w);
+    let sw = sin(w);
+    let param_5 = a;
+    let param_6 = vec2f(cw, sw);
     a = cmul(param_5, param_6);
-    var param_7 : vec2f = b;
-    var param_8 : vec2f = vec2f(cw, sw);
+    let param_7 = b;
+    let param_8 = vec2f(cw, sw);
     b = cmul(param_7, param_8);
     b = vec2f(b.x, -b.y);
-    var res : vec2f = a + b;
-    var param_9 : vec2f = res;
+    let res = a + b;
+    let param_9 = res;
     _225.heights[(i.y * N.x) + i.x] = pack2(param_9);
 }
 

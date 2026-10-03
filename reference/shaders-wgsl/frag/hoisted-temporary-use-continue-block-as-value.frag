@@ -5,9 +5,9 @@ var<private> vB : i32;
 fn frag_main()
 {
     FragColor = vec4f(0.0f);
-    var k : i32 = 0;
+    var k = 0;
     var j : i32;
-    for (var i : i32 = 0; i < vA; i += j)
+    for (var i = 0; i < vA; i += j)
     {
         if ((vA + i) == 20)
         {

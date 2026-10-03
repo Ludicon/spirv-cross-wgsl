@@ -68,7 +68,7 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var r : vec4f = ((((vA - vB * floor(vA / vB)) + fract(vA)) + inverseSqrt(vA)) + atan2(vA, vB)) + round(vA);
+    var r = ((((vA - vB * floor(vA / vB)) + fract(vA)) + inverseSqrt(vA)) + atan2(vA, vB)) + round(vA);
     r += vec4f(sign(vA.x), reflect(vec2f(vA.y, 0.0f), vec2f(vB.y, 0.0f)).x, refract(vec2f(vA.z, 0.0f), vec2f(vB.z, 0.0f), 0.5f).x, faceForward(vec2f(vA.w, 0.0f), vec2f(vB.w, 0.0f), vec2f(1.0f, 0.0f)).x);
     r += (((select(vec4f(0.0f), vec4f(1.0f), (vA < vB)) + select(vec4f(0.0f), vec4f(1.0f), !(vI == bitcast<vec4i>(vU)))) + select(vec4f(0.0f), vec4f(1.0f), (bitcast<vec4u>(vA) & vec4u(0x7fffffffu)) > vec4u(0x7f800000u))) + select(vec4f(0.0f), vec4f(1.0f), (bitcast<vec4u>(vB) & vec4u(0x7fffffffu)) == vec4u(0x7f800000u)));
     r += ((select(vA, vB, (vA < vB)) + mix(vA, vB, vec4f(0.25f))) + vec4f(select(0.0f, 1.0f, any(vA > vB))));
@@ -77,12 +77,12 @@ fn frag_main()
     r += (((spvInverse4x4(_161.m) * vA) + vec4f(spvInverse3x3(_161.m3) * vA.xyz, 0.0f)) + vec4f(spvInverse2x2(mat2x2f(_161.m2[0].xy, _161.m2[1].xy)) * vA.xy, 0.0f, 0.0f));
     r += ((vec4f(determinant(_161.m) + determinant(_161.m3)) + (transpose(_161.m) * vB)) + (mat4x4f(vA * vB.x, vA * vB.y, vA * vB.z, vA * vB.w) * vA));
     let _220_modf = modf(vA);
-    var _220 : ResType = ResType(_220_modf.fract, _220_modf.whole);
-    var whole : vec4f = _220._m1;
+    let _220 = ResType(_220_modf.fract, _220_modf.whole);
+    let whole = _220._m1;
     r += (_220._m0 + whole);
     let _231_frexp = frexp(vB);
-    var _231 : ResType_1 = ResType_1(_231_frexp.fract, _231_frexp.exp);
-    var e : vec4i = _231._m1;
+    let _231 = ResType_1(_231_frexp.fract, _231_frexp.exp);
+    let e = _231._m1;
     r += ((_231._m0 + vec4f(e)) + ldexp(vA, vec4i(2)));
     r += ((vec4f(f32(pack4x8snorm(vA) + pack2x16unorm(vB.xy))) + unpack4x8unorm(vU.x)) + vec4f(unpack2x16float(vU.y), 0.0f, 0.0f));
     FragColor = (((r + fma(vA, vB, vA)) + smoothstep(vA, vB, vec4f(0.5f))) + step(vA, vB)) + pow(abs(vA), vB);

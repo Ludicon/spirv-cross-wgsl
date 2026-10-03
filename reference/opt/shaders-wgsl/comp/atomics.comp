@@ -5,8 +5,6 @@ struct SSBO
     values : array<atomic<u32>>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(64u, 1u, 1u);
-
 @group(0) @binding(0) var<storage, read_write> ssbo : SSBO;
 
 var<private> gl_LocalInvocationIndex : u32;
@@ -21,17 +19,17 @@ fn comp_main()
         atomicStore(&shared_counter, 0u);
     }
     workgroupBarrier();
-    var _22 : u32 = atomicAdd(&shared_counter, 1u);
-    var _34 : i32 = atomicMax(&shared_values[gl_LocalInvocationIndex % 64u], bitcast<i32>(_22));
+    let _22 = atomicAdd(&shared_counter, 1u);
+    let _34 = atomicMax(&shared_values[gl_LocalInvocationIndex % 64u], bitcast<i32>(_22));
     workgroupBarrier();
-    var _43 : u32 = atomicAdd(&ssbo.counter, _22);
-    var _49 : i32 = atomicLoad(&shared_values[gl_LocalInvocationIndex]);
-    var _50 : i32 = atomicMin(&ssbo.signed_counter, _49);
-    var _58 : u32 = atomicOr(&ssbo.values[gl_GlobalInvocationID.x], 1u);
-    var _62 : u32 = atomicXor(&ssbo.values[gl_GlobalInvocationID.x], 2u);
-    var _67 : u32 = atomicAnd(&ssbo.values[gl_GlobalInvocationID.x], 3u);
-    var _74 : u32 = atomicExchange(&ssbo.values[gl_GlobalInvocationID.x + 1u], 4u);
-    var _81 : u32 = atomicCompareExchangeWeak(&ssbo.values[gl_GlobalInvocationID.x + 2u], _74, 5u).old_value;
+    let _43 = atomicAdd(&ssbo.counter, _22);
+    let _49 = atomicLoad(&shared_values[gl_LocalInvocationIndex]);
+    let _50 = atomicMin(&ssbo.signed_counter, _49);
+    let _58 = atomicOr(&ssbo.values[gl_GlobalInvocationID.x], 1u);
+    let _62 = atomicXor(&ssbo.values[gl_GlobalInvocationID.x], 2u);
+    let _67 = atomicAnd(&ssbo.values[gl_GlobalInvocationID.x], 3u);
+    let _74 = atomicExchange(&ssbo.values[gl_GlobalInvocationID.x + 1u], 4u);
+    let _81 = atomicCompareExchangeWeak(&ssbo.values[gl_GlobalInvocationID.x + 2u], _74, 5u).old_value;
 }
 
 struct SPIRV_Cross_Input

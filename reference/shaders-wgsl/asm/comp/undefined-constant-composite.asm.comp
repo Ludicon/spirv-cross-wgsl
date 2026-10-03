@@ -28,8 +28,8 @@ fn _39(_41 : i32, _42 : _20) -> i32
 
 fn comp_main()
 {
-    var _32 : i32 = _8._m0[gl_GlobalInvocationID.x];
-    var _33 : _20 = _20(_28, 200);
+    let _32 = _8._m0[gl_GlobalInvocationID.x];
+    let _33 = _20(_28, 200);
     _6._m0[gl_GlobalInvocationID.x] = _39(_32, _33);
 }
 

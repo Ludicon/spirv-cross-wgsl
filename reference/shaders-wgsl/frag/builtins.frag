@@ -8,7 +8,7 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var c : vec4f = gl_FragCoord;
+    var c = gl_FragCoord;
     if (gl_FrontFacing)
     {
         c *= 2.0f;

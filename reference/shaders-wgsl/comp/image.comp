@@ -1,5 +1,3 @@
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var uImageIn : texture_storage_2d<rgba8unorm, read>;
 @group(0) @binding(1) var uImageOut : texture_storage_2d<rgba8unorm, write>;
 
@@ -7,8 +5,8 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var _27 : vec4f = textureLoad(uImageIn, (bitcast<vec2i>(gl_GlobalInvocationID.xy) + vec2i(textureDimensions(uImageIn))));
-    var v : vec4f = _27;
+    let _27 = textureLoad(uImageIn, (bitcast<vec2i>(gl_GlobalInvocationID.xy) + vec2i(textureDimensions(uImageIn))));
+    let v = _27;
     textureStore(uImageOut, bitcast<vec2i>(gl_GlobalInvocationID.xy), v);
 }
 

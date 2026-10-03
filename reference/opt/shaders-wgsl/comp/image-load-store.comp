@@ -1,5 +1,3 @@
-const gl_WorkGroupSize : vec3u = vec3u(8u, 8u, 1u);
-
 @group(0) @binding(0) var uInput : texture_storage_2d<rgba8unorm, read>;
 @group(0) @binding(2) var uLayers : texture_storage_2d_array<r32float, read_write>;
 @group(0) @binding(1) var uOutput : texture_storage_2d<rgba16float, write>;
@@ -13,14 +11,14 @@ fn comp_main()
     {
         default:
         {
-            var _17 : vec2i = bitcast<vec2i>(gl_GlobalInvocationID.xy);
+            let _17 = bitcast<vec2i>(gl_GlobalInvocationID.xy);
             if (any(_17 >= vec2i(textureDimensions(uInput))))
             {
                 break;
             }
-            var _39 : vec4f = textureLoad(uInput, _17);
-            var _49 : i32 = _17.x;
-            var _52 : vec4f = textureLoad(uLayers, vec3i(_49, _17.y, 1).xy, vec3i(_49, _17.y, 1).z);
+            let _39 = textureLoad(uInput, _17);
+            let _49 = _17.x;
+            let _52 = textureLoad(uLayers, vec3i(_49, _17.y, 1).xy, vec3i(_49, _17.y, 1).z);
             textureStore(uLayers, vec3i(_49, _17.y, 0).xy, vec3i(_49, _17.y, 0).z, vec4f(_52.x * 2.0f));
             textureStore(uOutput, _17, _39 * _52.x);
             textureStore(uVolume, vec3i(_49, _17.y, 2), vec4u(_39 * 255.0f));

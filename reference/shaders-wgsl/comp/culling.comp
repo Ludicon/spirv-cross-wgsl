@@ -13,8 +13,6 @@ struct SSBO3
     count : atomic<u32>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(4u, 1u, 1u);
-
 @group(0) @binding(0) var<storage, read> _22 : SSBO;
 @group(0) @binding(1) var<storage, read_write> _38 : SSBO2;
 @group(0) @binding(2) var<storage, read_write> _41 : SSBO3;
@@ -23,11 +21,11 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var ident : u32 = gl_GlobalInvocationID.x;
-    var idata : f32 = _22.in_data[ident];
+    let ident = gl_GlobalInvocationID.x;
+    let idata = _22.in_data[ident];
     if (idata > 12.0f)
     {
-        var _45 : u32 = atomicAdd(&_41.count, 1u);
+        let _45 = atomicAdd(&_41.count, 1u);
         _38.out_data[_45] = idata;
     }
 }

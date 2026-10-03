@@ -3,8 +3,6 @@ struct SSBO
     value : vec4f,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(1) var<storage, read_write> _10 : SSBO;
 
 fn comp_main()

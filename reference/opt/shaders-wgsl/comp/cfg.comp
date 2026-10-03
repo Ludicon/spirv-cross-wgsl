@@ -3,7 +3,6 @@ struct SSBO
     data : f32,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
 var<private> _188 : f32;
 
 @group(0) @binding(0) var<storage, read_write> _11 : SSBO;
@@ -37,7 +36,7 @@ fn comp_main()
     }
     var _185 : f32;
     _185 = _188;
-    for (var _184 : i32 = 0; _184 < 20; )
+    for (var _184 = 0; _184 < 20; )
     {
         _185 += 10.0f;
         _184++;

@@ -700,6 +700,9 @@ protected:
 		const char *int32_min_literal = "int(0x80000000)";
 		// If true, redundant parentheses around if, for and while conditions are removed.
 		bool strip_condition_parentheses = false;
+		// If true, a break is emitted after an OpUnreachable merge inside a switch case, so that languages
+		// with case fallthrough do not fall into the next case, e.g. after "if (cond) break; else discard;".
+		bool unreachable_requires_switch_break = true;
 	} backend;
 
 	void emit_struct(SPIRType &type);
@@ -841,7 +844,7 @@ protected:
 
 	const char *index_to_swizzle(uint32_t index);
 	std::string remap_swizzle(const SPIRType &result_type, uint32_t input_components, const std::string &expr);
-	std::string declare_temporary(uint32_t type, uint32_t id);
+	virtual std::string declare_temporary(uint32_t type, uint32_t id);
 	bool can_declare_inline_temporary(uint32_t id) const;
 	void emit_uninitialized_temporary(uint32_t type, uint32_t id);
 	SPIRExpression &emit_uninitialized_temporary_expression(uint32_t type, uint32_t id);

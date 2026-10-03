@@ -2,7 +2,7 @@ var<private> FragColor : f32;
 
 fn frag_main()
 {
-    var foo : f32 = 1.0f;
+    var foo = 1.0f;
     loop
     {
         foo = 2.0f;

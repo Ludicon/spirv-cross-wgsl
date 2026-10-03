@@ -28,7 +28,7 @@ fn comp_main()
     workgroupBarrier();
     var _84 : f32;
     _84 = 0.0f;
-    for (var _83 : i32 = 0; _83 < DOUBLE_COUNT; )
+    for (var _83 = 0; _83 < DOUBLE_COUNT; )
     {
         _84 += cache[(gl_LocalInvocationIndex + bitcast<u32>(_83)) % _64];
         _83++;

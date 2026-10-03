@@ -3,16 +3,16 @@ var<private> FragColor : i32;
 fn frag_main()
 {
     FragColor = 16;
-    for (var i : i32 = 0; i < 25; i++)
+    for (var i = 0; i < 25; i++)
     {
         FragColor += 10;
     }
-    var i_1 : i32 = 1;
-    var j : i32 = 4;
+    var i_1 = 1;
+    var j = 4;
     loop
     {
-        var _36 : i32 = i_1;
-        var _38 : bool = _36 < 30;
+        let _36 = i_1;
+        let _38 = _36 < 30;
         if (_38)
         {
             FragColor += 11;
@@ -25,7 +25,7 @@ fn frag_main()
             break;
         }
     }
-    var k : i32 = 0;
+    var k = 0;
     for (; k < 20; k++)
     {
         FragColor += 12;
@@ -47,13 +47,13 @@ fn frag_main()
         l = k;
         FragColor += l;
     }
-    var i_2 : vec2i = vec2i(0);
+    var i_2 = vec2i(0);
     for (; i_2.x < 10; i_2.x += 4)
     {
         FragColor += i_2.y;
     }
-    var o : i32 = k;
-    for (var m : i32 = k; m < 40; m++)
+    let o = k;
+    for (var m = k; m < 40; m++)
     {
         FragColor += m;
     }

@@ -17,7 +17,6 @@ struct Composite
 }
 
 const _94 : array<array<f32, 3>, 2> = array<array<f32, 3>, 2>(array<f32, 3>(1.0f, 1.0f, 1.0f), array<f32, 3>(2.0f, 2.0f, 2.0f));
-const gl_WorkGroupSize : vec3u = vec3u(1u);
 
 @group(0) @binding(0) var<storage, read_write> _41 : SSBO0;
 @group(0) @binding(1) var<storage, read_write> _55 : SSBO1;
@@ -31,14 +30,14 @@ fn summe(values : array<array<vec4f, 2>, 3>) -> vec4f
 
 fn comp_main()
 {
-    var values : array<vec4f, 2> = array<vec4f, 2>(_41._as[gl_GlobalInvocationID.x], _55.bs[gl_GlobalInvocationID.x]);
-    var copy_values : array<vec4f, 2> = _66;
-    var copy_values2 : array<vec4f, 2> = values;
-    var param : array<array<vec4f, 2>, 3> = array<array<vec4f, 2>, 3>(values, copy_values, copy_values2);
+    let values = array<vec4f, 2>(_41._as[gl_GlobalInvocationID.x], _55.bs[gl_GlobalInvocationID.x]);
+    let copy_values = _66;
+    let copy_values2 = values;
+    let param = array<array<vec4f, 2>, 3>(values, copy_values, copy_values2);
     _41._as[gl_GlobalInvocationID.x] = summe(param);
-    var c : Composite = Composite(values, copy_values);
-    var b : f32 = 10.0f;
-    var values_scalar : array<f32, 4> = array<f32, 4>(b, b, b, b);
+    let c = Composite(values, copy_values);
+    let b = 10.0f;
+    let values_scalar = array<f32, 4>(b, b, b, b);
 }
 
 struct SPIRV_Cross_Input

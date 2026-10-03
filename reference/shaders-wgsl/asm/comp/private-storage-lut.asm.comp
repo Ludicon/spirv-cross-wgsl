@@ -5,8 +5,6 @@ struct SSBO
     data : array<u32>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(8u, 8u, 1u);
-
 @group(0) @binding(0) var<storage, read_write> _14 : SSBO;
 
 var<private> gl_LocalInvocationID : vec3u;
@@ -19,8 +17,8 @@ fn load_lut(index : u32) -> u32
 
 fn comp_main()
 {
-    var param : u32 = _21[gl_LocalInvocationID.y];
-    var v : u32 = _21[gl_LocalInvocationID.x] + load_lut(param);
+    let param = _21[gl_LocalInvocationID.y];
+    let v = _21[gl_LocalInvocationID.x] + load_lut(param);
     _14.data[gl_GlobalInvocationID.x] = v;
 }
 

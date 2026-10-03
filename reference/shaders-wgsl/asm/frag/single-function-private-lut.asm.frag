@@ -10,9 +10,9 @@ var<private> o_color : vec4f;
 
 fn frag_main()
 {
-    var uv : vec2f = gl_FragCoord.xy;
-    var index : i32 = i32(uv.x - 4.0f * floor(uv.x / 4.0f));
-    var elt : myType = _21[index];
+    let uv = gl_FragCoord.xy;
+    let index = i32(uv.x - 4.0f * floor(uv.x / 4.0f));
+    let elt = _21[index];
     if (elt.data > 0.0f)
     {
         o_color = vec4f(0.0f, 1.0f, 0.0f, 1.0f);

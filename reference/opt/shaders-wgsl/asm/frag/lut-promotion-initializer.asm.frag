@@ -6,8 +6,8 @@ var<private> index : i32;
 
 fn frag_main()
 {
-    var foobar : array<vec4f, 4> = _60;
-    var baz : array<vec4f, 4> = _60;
+    var foobar = _60;
+    var baz = _60;
     FragColor = _16[index];
     if (index < 10)
     {
@@ -17,7 +17,7 @@ fn frag_main()
     {
         FragColor += _16[index & 1];
     }
-    var _63 : bool = index > 30;
+    let _63 = index > 30;
     if (_63)
     {
         FragColor += _60[index & 3].y;
@@ -30,7 +30,7 @@ fn frag_main()
     {
         foobar[1].z = 20.0f;
     }
-    var _91 : i32 = index & 3;
+    let _91 = index & 3;
     FragColor += foobar[_91].z;
     baz = array<vec4f, 4>(vec4f(20.0f), vec4f(30.0f), vec4f(50.0f), vec4f(60.0f));
     FragColor += baz[_91].z;

@@ -5,7 +5,7 @@ var<private> gl_Position : vec4f;
 
 fn vert_main()
 {
-    var _15 : vec4f = vA * vB;
+    let _15 = vA * vB;
     gl_Position = ((_15 + (vA + vB)) + (vA - vB)) + (_15 + vC);
 }
 

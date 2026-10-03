@@ -7,7 +7,7 @@ fn _main() -> vec4f
 
 fn vert_main()
 {
-    var _17 : vec4f = _main();
+    let _17 = _main();
     gl_Position = _17;
 }
 

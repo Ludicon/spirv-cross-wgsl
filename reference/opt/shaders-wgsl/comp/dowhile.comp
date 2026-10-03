@@ -9,8 +9,6 @@ struct SSBO2
     out_data : array<vec4f>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(0) var<storage, read> _28 : SSBO;
 @group(0) @binding(1) var<storage, read_write> _52 : SSBO2;
 
@@ -26,7 +24,7 @@ fn comp_main()
     loop
     {
         _42 = _28.mvp * _59;
-        var _44 : i32 = _60 + 1;
+        let _44 = _60 + 1;
         if (_44 < 16)
         {
             _60 = _44;

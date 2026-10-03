@@ -38,8 +38,8 @@ fn overload_31(x : vec2f) -> vec2f
 
 fn sum(arr : array<f32, 4>) -> f32
 {
-    var s : f32 = 0.0f;
-    for (var i : i32 = 0; i < 4; i++)
+    var s = 0.0f;
+    for (var i = 0; i < 4; i++)
     {
         s += arr[i];
     }
@@ -49,21 +49,21 @@ fn sum(arr : array<f32, 4>) -> f32
 fn frag_main()
 {
     lights = array<f32, 4>(1.0f, 2.0f, 3.0f, 4.0f);
-    var c : vec4f = vColor;
-    var param : vec4f = c;
-    var param_2 : f32 = 2.0f;
+    var c = vColor;
+    var param = c;
+    let param_2 = 2.0f;
     var param_1 : f32;
     modify(&param, &param_1, param_2);
     c = param;
-    var f : f32 = param_1;
-    var l : Light = Light(vec3f(1.0f, 2.0f, 3.0f), 1.0f);
-    var param_3 : Light = l;
+    let f = param_1;
+    var l = Light(vec3f(1.0f, 2.0f, 3.0f), 1.0f);
+    var param_3 = l;
     modify_struct(&param_3);
     l = param_3;
     write_global();
-    var param_4 : f32 = f;
-    var param_5 : vec2f = vec2f(f);
-    var param_6 : array<f32, 4> = lights;
+    let param_4 = f;
+    let param_5 = vec2f(f);
+    let param_6 = lights;
     FragColor = ((c + vec4f(l.dir * l.intensity, f)) + g_color) + vec4f(overload(param_4), overload_31(param_5), sum(param_6));
 }
 

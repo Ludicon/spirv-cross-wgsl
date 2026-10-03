@@ -10,10 +10,10 @@ var<private> FragColor : f32;
 
 fn frag_main()
 {
-    var a : f32 = 0.0f;
-    var b : vec4f = vec4f(0.0f);
-    var c : mat2x3f = mat2x3f(vec3f(0.0f), vec3f(0.0f));
-    var d : D = D(vec4f(0.0f), 0.0f);
+    let a = 0.0f;
+    let b = vec4f(0.0f);
+    let c = mat2x3f(vec3f(0.0f), vec3f(0.0f));
+    let d = D(vec4f(0.0f), 0.0f);
     FragColor = a;
 }
 

@@ -3,13 +3,13 @@ var<private> FragColor : vec4f;
 fn frag_main()
 {
     FragColor = vec4f(0.0f);
-    var i : i32 = 0;
+    var i = 0;
     var _36 : i32;
     loop
     {
         if (i < 3)
         {
-            var a : i32 = i;
+            let a = i;
             FragColor[a] += f32(i);
             if (false)
             {
@@ -17,7 +17,7 @@ fn frag_main()
             }
             else
             {
-                var _41 : i32 = i;
+                let _41 = i;
                 i = _41 + 1;
                 _36 = _41;
             }

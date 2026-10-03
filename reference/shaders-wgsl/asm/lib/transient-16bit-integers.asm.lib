@@ -7,7 +7,7 @@ fn weighted(a : vec3h, b : vec3h, bits : u32) -> vec3h
 
 fn ramp(bits : vec4u) -> vec2h
 {
-    var _53 : vec4h = vec4h((bits & vec4u(255u)) & vec4u(0xffffu));
+    let _53 = vec4h((bits & vec4u(255u)) & vec4u(0xffffu));
     return _53.xy + _53.zw;
 }
 

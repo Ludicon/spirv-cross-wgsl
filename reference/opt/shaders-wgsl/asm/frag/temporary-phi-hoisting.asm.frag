@@ -16,7 +16,7 @@ fn frag_main()
 {
     var _85 : vec3f;
     _85 = vec3f(0.0f);
-    for (var _86 : i32 = 0; _86 < 4; )
+    for (var _86 = 0; _86 < 4; )
     {
         _85 += _8.g_MyStruct[_86].color.xyz;
         _86++;

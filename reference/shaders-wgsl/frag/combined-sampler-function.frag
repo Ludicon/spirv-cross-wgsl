@@ -10,8 +10,8 @@ var<private> vUV : vec2f;
 
 fn blur(tex : texture_2d<f32>, tex_sampler : sampler, uv : vec2f) -> vec4f
 {
-    var c : vec4f = vec4f(0.0f);
-    for (var i : i32 = -2; i <= 2; i++)
+    var c = vec4f(0.0f);
+    for (var i = -2; i <= 2; i++)
     {
         c += textureSample(tex, tex_sampler, (uv + vec2f(f32(i) * 0.00999999977648258209228515625f, 0.0f)));
     }
@@ -25,8 +25,8 @@ fn pcf(tex : texture_depth_2d, tex_sampler : sampler_comparison, uvz : vec3f) ->
 
 fn frag_main()
 {
-    var param : vec2f = vUV;
-    var param_1 : vec3f = vec3f(vUV, 0.25f);
+    let param = vUV;
+    let param_1 = vec3f(vUV, 0.25f);
     FragColor = blur(uTex, uTex_sampler, param) * pcf(uShadow, uShadow_sampler, param_1);
 }
 

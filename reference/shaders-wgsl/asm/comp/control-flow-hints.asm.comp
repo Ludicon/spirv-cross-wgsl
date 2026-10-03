@@ -8,21 +8,21 @@ struct bar
 
 fn _main()
 {
-    for (var i : i32 = 0; i < 16; i++)
+    for (var i = 0; i < 16; i++)
     {
         bar_1._data[i] = foo._data[i];
     }
-    for (var i_1 : i32 = 0; i_1 < 16; i_1++)
+    for (var i_1 = 0; i_1 < 16; i_1++)
     {
         bar_1._data[15 - i_1] = foo._data[i_1];
     }
-    var v : f32 = bar_1._data[10].x;
-    var w : f32 = foo._data[10].x;
+    let v = bar_1._data[10].x;
+    let w = foo._data[10].x;
     if (v > 10.0f)
     {
         foo._data[20] = vec4f(5.0f);
     }
-    var value : f32 = 20.0f;
+    var value = 20.0f;
     if (w > 40.0f)
     {
         value = 20.0f;

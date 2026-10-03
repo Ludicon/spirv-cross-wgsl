@@ -5,11 +5,11 @@ var<private> gl_Position : vec4f;
 
 fn vert_main()
 {
-    var mul : vec4f = vA * vB;
-    var add : vec4f = vA + vB;
-    var sub : vec4f = vA - vB;
-    var mad : vec4f = (vA * vB) + vC;
-    var summed : vec4f = ((mul + add) + sub) + mad;
+    let mul = vA * vB;
+    let add = vA + vB;
+    let sub = vA - vB;
+    let mad = (vA * vB) + vC;
+    let summed = ((mul + add) + sub) + mad;
     gl_Position = summed;
 }
 

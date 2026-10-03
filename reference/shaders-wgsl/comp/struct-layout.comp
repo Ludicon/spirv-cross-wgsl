@@ -13,8 +13,6 @@ struct SSBO
     in_data : array<Foo>,
 }
 
-const gl_WorkGroupSize : vec3u = vec3u(1u);
-
 @group(0) @binding(1) var<storage, read_write> _23 : SSBO2;
 @group(0) @binding(0) var<storage, read> _30 : SSBO;
 
@@ -22,7 +20,7 @@ var<private> gl_GlobalInvocationID : vec3u;
 
 fn comp_main()
 {
-    var ident : u32 = gl_GlobalInvocationID.x;
+    let ident = gl_GlobalInvocationID.x;
     _23.out_data[ident].m = _30.in_data[ident].m * _30.in_data[ident].m;
 }
 

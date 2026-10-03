@@ -4,8 +4,8 @@ var<private> counter : i32;
 fn frag_main()
 {
     FragColor = vec4f(0.0f);
-    var _53 : i32 = 0;
-    var _54 : u32 = 1u;
+    var _53 = 0;
+    var _54 = 1u;
     for (; (_53 < 10) && (bitcast<i32>(_54) < bitcast<i32>(20u)); )
     {
         FragColor += vec4f(f32(_53));

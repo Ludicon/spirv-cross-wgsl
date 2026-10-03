@@ -5,8 +5,8 @@ var<private> vIn1 : vec4i;
 fn frag_main()
 {
     FragColor = -(-vIn);
-    var a : vec4i = ~(~vIn1);
-    var b : bool = false;
+    let a = ~(~vIn1);
+    var b = false;
     b = !(!b);
 }
 

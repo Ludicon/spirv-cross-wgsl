@@ -30,11 +30,11 @@ fn comp_main()
     _4.a2 = clamp(_4.a2, _4.b2, _4.c2);
     _4.a3 = clamp(_4.a3, _4.b3, _4.c3);
     _4.a4 = clamp(_4.a4, _4.b4, _4.c4);
-    var i : i32 = 0;
+    var i = 0;
     loop
     {
-        var _120 : i32 = i;
-        var _121 : bool = _120 < 2;
+        let _120 = i;
+        let _121 = _120 < 2;
         if (_121)
         {
             _4.a2 = min(_4.b2, _4.c2);

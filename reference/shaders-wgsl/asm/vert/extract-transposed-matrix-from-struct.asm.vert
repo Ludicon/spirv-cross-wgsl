@@ -41,11 +41,11 @@ fn _VS(PosL_1 : vec3f, instanceID : u32) -> V2F
 
 fn vert_main()
 {
-    var PosL_1 : vec3f = PosL;
-    var instanceID : u32 = bitcast<u32>(gl_InstanceIndex);
-    var param : vec3f = PosL_1;
-    var param_1 : u32 = instanceID;
-    var flattenTemp : V2F = _VS(param, param_1);
+    let PosL_1 = PosL;
+    let instanceID = bitcast<u32>(gl_InstanceIndex);
+    let param = PosL_1;
+    let param_1 = instanceID;
+    let flattenTemp = _VS(param, param_1);
     gl_Position = flattenTemp.Position;
     _entryPointOutput_Color = flattenTemp.Color;
 }

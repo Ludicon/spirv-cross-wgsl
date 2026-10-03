@@ -8,8 +8,8 @@ var<private> FragColor : vec4f;
 
 fn frag_main()
 {
-    var _19 : vec4f = textureSample(Texture, Texture_sampler, vTexCoord);
-    var _22 : f32 = _19.x;
+    let _19 = textureSample(Texture, Texture_sampler, vTexCoord);
+    let _22 = _19.x;
     FragColor = vec4f(_22 * _22);
 }
 

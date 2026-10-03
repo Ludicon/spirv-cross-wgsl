@@ -97,14 +97,14 @@ var<private> _4317 : vec4f;
 
 fn frag_main()
 {
-    var _19927 : vec2f = gl_FragCoord.xy * _15259._m23.xy;
-    var _17581 : vec4f = _22044._m2 * _22044._m0.xyxy;
-    var _7011 : vec2f = _17581.xy;
-    var _21058 : vec2f = _17581.zw;
-    var _13149 : vec2f = clamp(_19927 + (vec2f(0.0f, -2.0f) * _22044._m0.xy), _7011, _21058);
-    var _12103 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13149, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17670 : vec4f = textureSampleLevel(_3312, _4646, _13149, 0.0f);
-    var _16938 : f32 = _17670.y;
+    let _19927 = gl_FragCoord.xy * _15259._m23.xy;
+    let _17581 = _22044._m2 * _22044._m0.xyxy;
+    let _7011 = _17581.xy;
+    let _21058 = _17581.zw;
+    let _13149 = clamp(_19927 + (vec2f(0.0f, -2.0f) * _22044._m0.xy), _7011, _21058);
+    let _12103 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13149, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17670 = textureSampleLevel(_3312, _4646, _13149, 0.0f);
+    let _16938 = _17670.y;
     var _7719 : vec3f;
     if (_16938 > 0.0f)
     {
@@ -114,10 +114,10 @@ fn frag_main()
     {
         _7719 = _12103;
     }
-    var _13150 : vec2f = clamp(_19927 + (vec2f(-1.0f) * _22044._m0.xy), _7011, _21058);
-    var _12104 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13150, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17671 : vec4f = textureSampleLevel(_3312, _4646, _13150, 0.0f);
-    var _16939 : f32 = _17671.y;
+    let _13150 = clamp(_19927 + (vec2f(-1.0f) * _22044._m0.xy), _7011, _21058);
+    let _12104 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13150, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17671 = textureSampleLevel(_3312, _4646, _13150, 0.0f);
+    let _16939 = _17671.y;
     var _7720 : vec3f;
     if (_16939 > 0.0f)
     {
@@ -127,10 +127,10 @@ fn frag_main()
     {
         _7720 = _12104;
     }
-    var _13151 : vec2f = clamp(_19927 + (vec2f(0.0f, -1.0f) * _22044._m0.xy), _7011, _21058);
-    var _12105 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13151, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17672 : vec4f = textureSampleLevel(_3312, _4646, _13151, 0.0f);
-    var _16940 : f32 = _17672.y;
+    let _13151 = clamp(_19927 + (vec2f(0.0f, -1.0f) * _22044._m0.xy), _7011, _21058);
+    let _12105 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13151, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17672 = textureSampleLevel(_3312, _4646, _13151, 0.0f);
+    let _16940 = _17672.y;
     var _7721 : vec3f;
     if (_16940 > 0.0f)
     {
@@ -140,10 +140,10 @@ fn frag_main()
     {
         _7721 = _12105;
     }
-    var _13152 : vec2f = clamp(_19927 + (vec2f(1.0f, -1.0f) * _22044._m0.xy), _7011, _21058);
-    var _12106 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13152, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17673 : vec4f = textureSampleLevel(_3312, _4646, _13152, 0.0f);
-    var _16941 : f32 = _17673.y;
+    let _13152 = clamp(_19927 + (vec2f(1.0f, -1.0f) * _22044._m0.xy), _7011, _21058);
+    let _12106 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13152, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17673 = textureSampleLevel(_3312, _4646, _13152, 0.0f);
+    let _16941 = _17673.y;
     var _7722 : vec3f;
     if (_16941 > 0.0f)
     {
@@ -153,10 +153,10 @@ fn frag_main()
     {
         _7722 = _12106;
     }
-    var _13153 : vec2f = clamp(_19927 + (vec2f(-2.0f, 0.0f) * _22044._m0.xy), _7011, _21058);
-    var _12107 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13153, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17674 : vec4f = textureSampleLevel(_3312, _4646, _13153, 0.0f);
-    var _16942 : f32 = _17674.y;
+    let _13153 = clamp(_19927 + (vec2f(-2.0f, 0.0f) * _22044._m0.xy), _7011, _21058);
+    let _12107 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13153, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17674 = textureSampleLevel(_3312, _4646, _13153, 0.0f);
+    let _16942 = _17674.y;
     var _7723 : vec3f;
     if (_16942 > 0.0f)
     {
@@ -166,10 +166,10 @@ fn frag_main()
     {
         _7723 = _12107;
     }
-    var _13154 : vec2f = clamp(_19927 + (vec2f(-1.0f, 0.0f) * _22044._m0.xy), _7011, _21058);
-    var _12108 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13154, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17675 : vec4f = textureSampleLevel(_3312, _4646, _13154, 0.0f);
-    var _16943 : f32 = _17675.y;
+    let _13154 = clamp(_19927 + (vec2f(-1.0f, 0.0f) * _22044._m0.xy), _7011, _21058);
+    let _12108 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13154, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17675 = textureSampleLevel(_3312, _4646, _13154, 0.0f);
+    let _16943 = _17675.y;
     var _7724 : vec3f;
     if (_16943 > 0.0f)
     {
@@ -179,10 +179,10 @@ fn frag_main()
     {
         _7724 = _12108;
     }
-    var _13155 : vec2f = clamp(_19927, _7011, _21058);
-    var _12109 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13155, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17676 : vec4f = textureSampleLevel(_3312, _4646, _13155, 0.0f);
-    var _16944 : f32 = _17676.y;
+    let _13155 = clamp(_19927, _7011, _21058);
+    let _12109 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13155, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17676 = textureSampleLevel(_3312, _4646, _13155, 0.0f);
+    let _16944 = _17676.y;
     var _7725 : vec3f;
     if (_16944 > 0.0f)
     {
@@ -192,10 +192,10 @@ fn frag_main()
     {
         _7725 = _12109;
     }
-    var _13156 : vec2f = clamp(_19927 + (vec2f(1.0f, 0.0f) * _22044._m0.xy), _7011, _21058);
-    var _12110 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13156, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17677 : vec4f = textureSampleLevel(_3312, _4646, _13156, 0.0f);
-    var _16945 : f32 = _17677.y;
+    let _13156 = clamp(_19927 + (vec2f(1.0f, 0.0f) * _22044._m0.xy), _7011, _21058);
+    let _12110 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13156, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17677 = textureSampleLevel(_3312, _4646, _13156, 0.0f);
+    let _16945 = _17677.y;
     var _7726 : vec3f;
     if (_16945 > 0.0f)
     {
@@ -205,10 +205,10 @@ fn frag_main()
     {
         _7726 = _12110;
     }
-    var _13157 : vec2f = clamp(_19927 + (vec2f(2.0f, 0.0f) * _22044._m0.xy), _7011, _21058);
-    var _12111 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13157, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17678 : vec4f = textureSampleLevel(_3312, _4646, _13157, 0.0f);
-    var _16946 : f32 = _17678.y;
+    let _13157 = clamp(_19927 + (vec2f(2.0f, 0.0f) * _22044._m0.xy), _7011, _21058);
+    let _12111 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13157, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17678 = textureSampleLevel(_3312, _4646, _13157, 0.0f);
+    let _16946 = _17678.y;
     var _7727 : vec3f;
     if (_16946 > 0.0f)
     {
@@ -218,10 +218,10 @@ fn frag_main()
     {
         _7727 = _12111;
     }
-    var _13158 : vec2f = clamp(_19927 + (vec2f(-1.0f, 1.0f) * _22044._m0.xy), _7011, _21058);
-    var _12112 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13158, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17679 : vec4f = textureSampleLevel(_3312, _4646, _13158, 0.0f);
-    var _16947 : f32 = _17679.y;
+    let _13158 = clamp(_19927 + (vec2f(-1.0f, 1.0f) * _22044._m0.xy), _7011, _21058);
+    let _12112 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13158, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17679 = textureSampleLevel(_3312, _4646, _13158, 0.0f);
+    let _16947 = _17679.y;
     var _7728 : vec3f;
     if (_16947 > 0.0f)
     {
@@ -231,10 +231,10 @@ fn frag_main()
     {
         _7728 = _12112;
     }
-    var _13159 : vec2f = clamp(_19927 + (vec2f(0.0f, 1.0f) * _22044._m0.xy), _7011, _21058);
-    var _12113 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13159, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17680 : vec4f = textureSampleLevel(_3312, _4646, _13159, 0.0f);
-    var _16948 : f32 = _17680.y;
+    let _13159 = clamp(_19927 + (vec2f(0.0f, 1.0f) * _22044._m0.xy), _7011, _21058);
+    let _12113 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13159, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17680 = textureSampleLevel(_3312, _4646, _13159, 0.0f);
+    let _16948 = _17680.y;
     var _7729 : vec3f;
     if (_16948 > 0.0f)
     {
@@ -244,10 +244,10 @@ fn frag_main()
     {
         _7729 = _12113;
     }
-    var _13160 : vec2f = clamp(_19927 + _22044._m0.xy, _7011, _21058);
-    var _12114 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13160, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17681 : vec4f = textureSampleLevel(_3312, _4646, _13160, 0.0f);
-    var _16949 : f32 = _17681.y;
+    let _13160 = clamp(_19927 + _22044._m0.xy, _7011, _21058);
+    let _12114 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13160, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17681 = textureSampleLevel(_3312, _4646, _13160, 0.0f);
+    let _16949 = _17681.y;
     var _7730 : vec3f;
     if (_16949 > 0.0f)
     {
@@ -257,10 +257,10 @@ fn frag_main()
     {
         _7730 = _12114;
     }
-    var _13161 : vec2f = clamp(_19927 + (vec2f(0.0f, 2.0f) * _22044._m0.xy), _7011, _21058);
-    var _12115 : vec3f = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13161, 0.0f).w * _22044._m1, 0.0f, 1.0f);
-    var _17682 : vec4f = textureSampleLevel(_3312, _4646, _13161, 0.0f);
-    var _16950 : f32 = _17682.y;
+    let _13161 = clamp(_19927 + (vec2f(0.0f, 2.0f) * _22044._m0.xy), _7011, _21058);
+    let _12115 = _12348._m5 * clamp(textureSampleLevel(_5785, _5688, _13161, 0.0f).w * _22044._m1, 0.0f, 1.0f);
+    let _17682 = textureSampleLevel(_3312, _4646, _13161, 0.0f);
+    let _16950 = _17682.y;
     var _7731 : vec3f;
     if (_16950 > 0.0f)
     {
@@ -270,8 +270,8 @@ fn frag_main()
     {
         _7731 = _12115;
     }
-    var _13750 : vec3f = (((((((((((((_7719 * 0.5f).xyz + (_7720 * 0.5f)).xyz + (_7721 * 0.75f)).xyz + (_7722 * 0.5f)).xyz + (_7723 * 0.5f)).xyz + (_7724 * 0.75f)).xyz + (_7725 * 1.0f)).xyz + (_7726 * 0.75f)).xyz + (_7727 * 0.5f)).xyz + (_7728 * 0.5f)).xyz + (_7729 * 0.75f)).xyz + (_7730 * 0.5f)).xyz + (_7731 * 0.5f)).xyz * vec3f(0.125f);
-    var _25050 : _15 = _15(vec4f(_13750.x, _13750.y, _13750.z, vec4f(0.0f).w));
+    let _13750 = (((((((((((((_7719 * 0.5f).xyz + (_7720 * 0.5f)).xyz + (_7721 * 0.75f)).xyz + (_7722 * 0.5f)).xyz + (_7723 * 0.5f)).xyz + (_7724 * 0.75f)).xyz + (_7725 * 1.0f)).xyz + (_7726 * 0.75f)).xyz + (_7727 * 0.5f)).xyz + (_7728 * 0.5f)).xyz + (_7729 * 0.75f)).xyz + (_7730 * 0.5f)).xyz + (_7731 * 0.5f)).xyz * vec3f(0.125f);
+    var _25050 = _15(vec4f(_13750.x, _13750.y, _13750.z, vec4f(0.0f).w));
     _25050._m0.w = 1.0f;
     _4317 = _25050._m0;
 }
