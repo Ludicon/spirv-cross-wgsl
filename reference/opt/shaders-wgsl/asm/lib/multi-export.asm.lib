@@ -1,0 +1,10 @@
+fn add_one(x : u32) -> u32
+{
+    return x + 1u;
+}
+
+fn add_two(y : u32) -> u32
+{
+    return y + 2u;
+}
+

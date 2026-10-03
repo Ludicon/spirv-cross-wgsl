@@ -742,6 +742,7 @@ struct CLIArguments
 	uint32_t wgsl_push_constant_group = 0;
 	uint32_t wgsl_push_constant_binding = 0;
 	bool wgsl_disallow_non_uniform_derivatives = false;
+	SmallVector<WGSLWarning> wgsl_disabled_warnings;
 	bool hlsl_compat = false;
 
 	bool hlsl_support_nonzero_base = false;
@@ -844,6 +845,13 @@ static void print_help_wgsl()
 	                "\t[--wgsl-combined-sampler-binding-offset <offset>]:\n\t\tCombined image samplers are split into a texture and a sampler. "
 	                "The sampler is assigned the binding of the combined image sampler plus this offset. Default is 16.\n"
 	                "\t[--wgsl-push-constant-binding <group> <binding>]:\n\t\tPush constant blocks are emitted as uniform buffers with this group and binding. Default is 0 0.\n"
+	                "\t[--wgsl-disable-warning <name>]:\n\t\tDo not report a warning. Can be given multiple times. Warnings are:\n"
+	                "\t\t  non-finite-constant: infinity or NaN constants computed at runtime with spvNonFinite().\n"
+	                "\t\t  depth-compare-lod: depth comparisons with explicit LOD or gradients, sampled at LOD 0.\n"
+	                "\t\t  ignored-bias: LOD bias outside of fragment shaders.\n"
+	                "\t\t  weak-compare-exchange: compare-exchange atomics emitted as atomicCompareExchangeWeak().\n"
+	                "\t\t  ignored-builtin: builtins without a WGSL equivalent, e.g. gl_PointSize.\n"
+	                "\t\t  all: every warning.\n"
 	                "\t[--wgsl-disallow-non-uniform-derivatives]:\n\t\tDo not emit diagnostic(off, derivative_uniformity) for shaders which use implicit derivatives.\n"
 	);
 	// clang-format on
@@ -1365,6 +1373,8 @@ static string compile_iteration(const CLIArguments &args, std::vector<uint32_t> 
 		wgsl_opts.push_constant_binding = args.wgsl_push_constant_binding;
 		wgsl_opts.allow_non_uniform_derivatives = !args.wgsl_disallow_non_uniform_derivatives;
 		wgsl->set_wgsl_options(wgsl_opts);
+		for (auto warning : args.wgsl_disabled_warnings)
+			wgsl->set_warning_enabled(warning, false);
 	}
 	else
 	{
@@ -1661,6 +1671,12 @@ static string compile_iteration(const CLIArguments &args, std::vector<uint32_t> 
 
 	auto ret = compiler->compile();
 
+	if (args.wgsl)
+	{
+		for (auto &warning : static_cast<CompilerWGSL *>(compiler.get())->get_warnings())
+			fprintf(stderr, "Warning [%s]: %s\n", CompilerWGSL::get_warning_name(warning.kind), warning.message.c_str());
+	}
+
 	if (args.dump_resources)
 	{
 		compiler->update_active_builtins();
@@ -1769,6 +1785,25 @@ static int main_inner(int argc, char *argv[])
 	cbs.add("--wgsl", [&args](CLIParser &) { args.wgsl = true; });
 	cbs.add("--wgsl-combined-sampler-binding-offset",
 	        [&args](CLIParser &parser) { args.wgsl_combined_sampler_binding_offset = parser.next_uint(); });
+	cbs.add("--wgsl-disable-warning", [&args](CLIParser &parser) {
+		std::string name = parser.next_string();
+		WGSLWarning warning;
+		if (name == "all")
+		{
+			for (uint32_t i = 0; i < WGSL_WARNING_COUNT; i++)
+				args.wgsl_disabled_warnings.push_back(WGSLWarning(i));
+		}
+		else if (CompilerWGSL::get_warning_from_name(name, warning))
+			args.wgsl_disabled_warnings.push_back(warning);
+		else
+		{
+			fprintf(stderr, "Unknown WGSL warning: %s. Valid warnings are:", name.c_str());
+			for (uint32_t i = 0; i < WGSL_WARNING_COUNT; i++)
+				fprintf(stderr, " %s", CompilerWGSL::get_warning_name(WGSLWarning(i)));
+			fprintf(stderr, ", all.\n");
+			exit(EXIT_FAILURE);
+		}
+	});
 	cbs.add("--wgsl-disallow-non-uniform-derivatives",
 	        [&args](CLIParser &) { args.wgsl_disallow_non_uniform_derivatives = true; });
 	cbs.add("--wgsl-push-constant-binding", [&args](CLIParser &parser) {

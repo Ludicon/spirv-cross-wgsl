@@ -1,0 +1,13 @@
+enable f16;
+
+fn weighted(a : vec3h, b : vec3h, bits : u32) -> vec3h
+{
+    return ((a * f16((bits & 15u) & 0xffffu)) + (b * f16(((bits >> 4u) & 15u) & 0xffffu))) + vec3h(f16(((bitcast<i32>(bits) - 8) << 16u) >> 16u));
+}
+
+fn ramp(bits : vec4u) -> vec2h
+{
+    var _53 : vec4h = vec4h((bits & vec4u(255u)) & vec4u(0xffffu));
+    return _53.xy + _53.zw;
+}
+

@@ -1083,8 +1083,8 @@ protected:
 
 	std::string convert_floate4m3_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
 	std::string convert_floate5m2_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
-	std::string convert_half_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
-	std::string convert_float_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
+	virtual std::string convert_half_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
+	virtual std::string convert_float_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
 	std::string convert_double_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
 	std::string int32_to_string(int32_t value) const;
 

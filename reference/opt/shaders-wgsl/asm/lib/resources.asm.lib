@@ -1,0 +1,37 @@
+const _29 : array<f32, 4> = array<f32, 4>(0.0999999940395355224609375f, 0.199999988079071044921875f, 0.2999999821186065673828125f, 0.39999997615814208984375f);
+
+struct type_RWStructuredBuffer_uint
+{
+    _m0 : array<u32>,
+}
+
+struct Block
+{
+    color : vec4f,
+    index : u32,
+}
+
+@group(0) @binding(1) var<storage, read_write> g_output : type_RWStructuredBuffer_uint;
+@group(0) @binding(0) var g_texture : texture_2d<f32>;
+@group(0) @binding(0) var g_sampler : sampler;
+
+fn load_block(uv : vec2f, index : u32) -> Block
+{
+    var _63 : f32;
+    _63 = 0.0f;
+    for (var _66 : u32 = 0u; _66 < index; )
+    {
+        _63 += _29[_66 & 3u];
+        _66++;
+        continue;
+    }
+    return Block(textureSampleLevel(g_texture, g_sampler, uv, 0.0f) * _63, index);
+}
+
+fn encode(b : Block, _packed : ptr<function, vec2u>, error : ptr<function, f32>)
+{
+    (*_packed) = vec2u(pack2x16float(vec2f(b.color.x, 0.0f)) | (pack2x16float(vec2f(b.color.y, 0.0f)) << 16u), b.index);
+    (*error) += dot(b.color, b.color);
+    g_output._m0[b.index] = (*_packed).x;
+}
+

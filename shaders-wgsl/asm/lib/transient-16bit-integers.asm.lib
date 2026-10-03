@@ -1,0 +1,98 @@
+; SPIR-V
+; Version: 1.5
+; Generator: Google spiregg; 0
+; Bound: 57
+; Schema: 0
+               OpCapability MinLod
+               OpCapability StorageImageWriteWithoutFormat
+               OpCapability StorageImageReadWithoutFormat
+               OpCapability FragmentShaderSampleInterlockEXT
+               OpCapability FragmentShaderPixelInterlockEXT
+               OpCapability FragmentShaderShadingRateInterlockEXT
+               OpCapability ComputeDerivativeGroupQuadsKHR
+               OpCapability ComputeDerivativeGroupLinearKHR
+               OpCapability RayQueryKHR
+               OpCapability GroupNonUniformPartitionedEXT
+               OpCapability InterpolationFunction
+               OpCapability QuadControlKHR
+               OpCapability Linkage
+               OpCapability Float16
+               OpCapability Int16
+               OpCapability Shader
+               OpExtension "SPV_EXT_fragment_shader_interlock"
+               OpExtension "SPV_KHR_compute_shader_derivatives"
+               OpExtension "SPV_KHR_ray_query"
+               OpExtension "SPV_NV_shader_subgroup_partitioned"
+               OpExtension "SPV_KHR_quad_control"
+               OpMemoryModel Logical GLSL450
+               OpSource HLSL 630
+               OpName %1 "weighted"
+               OpName %2 "a"
+               OpName %3 "b"
+               OpName %4 "bits"
+               OpName %5 "bb.entry"
+               OpName %6 "ramp"
+               OpName %7 "bits"
+               OpName %8 "bb.entry"
+               OpDecorate %1 LinkageAttributes "weighted" Export
+               OpDecorate %6 LinkageAttributes "ramp" Export
+          %9 = OpTypeInt 32 0
+         %10 = OpConstant %9 15
+         %11 = OpConstant %9 4
+         %12 = OpTypeInt 32 1
+         %13 = OpConstant %12 8
+         %14 = OpConstant %9 255
+         %15 = OpTypeVector %9 4
+         %16 = OpConstantComposite %15 %14 %14 %14 %14
+         %17 = OpTypeFloat 16
+         %18 = OpTypeVector %17 3
+         %19 = OpTypePointer Function %18
+         %20 = OpTypePointer Function %9
+         %21 = OpTypeFunction %18 %19 %19 %20
+         %22 = OpTypeInt 16 0
+         %23 = OpTypeInt 16 1
+         %24 = OpTypeVector %17 2
+         %25 = OpTypePointer Function %15
+         %26 = OpTypeFunction %24 %25
+         %27 = OpTypeVector %17 4
+         %28 = OpTypeVector %22 4
+          %1 = OpFunction %18 None %21
+          %2 = OpFunctionParameter %19
+          %3 = OpFunctionParameter %19
+          %4 = OpFunctionParameter %20
+          %5 = OpLabel
+         %29 = OpLoad %9 %4
+         %30 = OpBitwiseAnd %9 %29 %10
+         %31 = OpUConvert %22 %30
+         %32 = OpConvertUToF %17 %31
+         %33 = OpLoad %9 %4
+         %34 = OpShiftRightLogical %9 %33 %11
+         %35 = OpBitwiseAnd %9 %34 %10
+         %36 = OpUConvert %22 %35
+         %37 = OpConvertUToF %17 %36
+         %38 = OpLoad %9 %4
+         %39 = OpBitcast %12 %38
+         %40 = OpISub %12 %39 %13
+         %41 = OpSConvert %23 %40
+         %42 = OpConvertSToF %17 %41
+         %43 = OpLoad %18 %2
+         %44 = OpVectorTimesScalar %18 %43 %32
+         %45 = OpLoad %18 %3
+         %46 = OpVectorTimesScalar %18 %45 %37
+         %47 = OpFAdd %18 %44 %46
+         %48 = OpCompositeConstruct %18 %42 %42 %42
+         %49 = OpFAdd %18 %47 %48
+               OpReturnValue %49
+               OpFunctionEnd
+          %6 = OpFunction %24 None %26
+          %7 = OpFunctionParameter %25
+          %8 = OpLabel
+         %50 = OpLoad %15 %7
+         %51 = OpBitwiseAnd %15 %50 %16
+         %52 = OpUConvert %28 %51
+         %53 = OpConvertUToF %27 %52
+         %54 = OpVectorShuffle %24 %53 %53 0 1
+         %55 = OpVectorShuffle %24 %53 %53 2 3
+         %56 = OpFAdd %24 %54 %55
+               OpReturnValue %56
+               OpFunctionEnd

@@ -631,8 +631,14 @@ def cross_compile_wgsl(shader, spirv, opt, force_no_external_validation, iterati
 
     spirv_16 = '.spv16.' in shader
     spirv_14 = '.spv14.' in shader
+    is_library = shader_is_library(shader)
 
-    if spirv_16:
+    if is_library:
+        # Library modules use the Linkage capability, which is rejected
+        # by Vulkan target envs. Use a universal/spv target instead.
+        spirv_env = 'spv1.5'
+        glslang_env = 'spirv1.5'
+    elif spirv_16:
         spirv_env = 'spv1.6'
         glslang_env = 'vulkan1.3'
     elif spirv_14:
@@ -650,7 +656,10 @@ def cross_compile_wgsl(shader, spirv, opt, force_no_external_validation, iterati
     if opt and (not shader_is_invalid_spirv(wgsl_path)):
         subprocess.check_call([paths.spirv_opt, '--skip-validation', '-O', '-o', spirv_path, spirv_path])
 
-    wgsl_args = [paths.spirv_cross, '--entry', 'main', '--output', wgsl_path, spirv_path, '--wgsl', '--iterations', str(iterations)]
+    wgsl_args = [paths.spirv_cross]
+    if not is_library:
+        wgsl_args += ['--entry', 'main']
+    wgsl_args += ['--output', wgsl_path, spirv_path, '--wgsl', '--iterations', str(iterations)]
     subprocess.check_call(wgsl_args)
 
     if not shader_is_invalid_spirv(wgsl_path):

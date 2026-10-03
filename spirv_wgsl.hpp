@@ -43,9 +43,39 @@ using namespace SPIRV_CROSS_SPV_HEADER_NAMESPACE;
 //
 // WGSL has no push constants. Push constant blocks are emitted as uniform buffers using
 // push_constant_group and push_constant_binding.
+
+// Warnings for constructs which compile, but whose translation is not exact.
+// Retrieve them with CompilerWGSL::get_warnings() after compile().
+enum WGSLWarning
+{
+	// Infinity or NaN constants are computed at runtime with spvNonFinite(), since WGSL rejects
+	// non-finite values in constant expressions.
+	WGSL_WARNING_NON_FINITE_CONSTANT = 0,
+
+	// Depth comparison with an explicit non-zero LOD or gradients. WGSL only supports comparisons at LOD 0.
+	WGSL_WARNING_DEPTH_COMPARE_LOD,
+
+	// LOD bias outside of fragment shaders is ignored.
+	WGSL_WARNING_IGNORED_BIAS,
+
+	// Strong compare-exchange atomics are emitted as atomicCompareExchangeWeak(), which may fail spuriously.
+	WGSL_WARNING_WEAK_COMPARE_EXCHANGE,
+
+	// Builtin outputs which do not exist in WGSL (e.g. gl_PointSize) are written but ignored.
+	WGSL_WARNING_IGNORED_BUILTIN,
+
+	WGSL_WARNING_COUNT
+};
+
 class CompilerWGSL : public CompilerGLSL
 {
 public:
+	struct Warning
+	{
+		WGSLWarning kind;
+		std::string message;
+	};
+
 	struct Options
 	{
 		// Binding offset applied to the sampler part of combined image samplers.
@@ -93,6 +123,19 @@ public:
 
 	std::string compile() override;
 
+	// Warnings produced by the last call to compile(). Disabled warnings are not reported.
+	const SmallVector<Warning> &get_warnings() const
+	{
+		return warnings;
+	}
+
+	void set_warning_enabled(WGSLWarning kind, bool enabled);
+	bool is_warning_enabled(WGSLWarning kind) const;
+
+	// Short names, e.g. "non-finite-constant", used for diagnostics and command line options.
+	static const char *get_warning_name(WGSLWarning kind);
+	static bool get_warning_from_name(const std::string &name, WGSLWarning &kind);
+
 protected:
 	std::string type_to_glsl(const SPIRType &type, uint32_t id = 0) override;
 	std::string type_to_array_glsl(const SPIRType &type, uint32_t variable_id) override;
@@ -130,12 +173,20 @@ protected:
 	std::string convert_row_major_matrix(std::string exp_str, const SPIRType &exp_type, uint32_t physical_type_id,
 	                                     bool is_packed, bool relaxed) override;
 	void emit_store_statement(uint32_t lhs_expression, uint32_t rhs_expression) override;
+	std::string convert_half_to_string(const SPIRConstant &value, uint32_t col, uint32_t row) override;
+	std::string convert_float_to_string(const SPIRConstant &value, uint32_t col, uint32_t row) override;
+	std::string non_finite_float_expression(uint32_t bits);
 	void emit_subgroup_op(const Instruction &i) override;
 	bool skip_argument(uint32_t id) const override;
 	using CompilerGLSL::variable_decl;
 
 private:
 	Options wgsl_options;
+
+	SmallVector<Warning> warnings;
+	uint32_t disabled_warnings = 0;
+	void warn(WGSLWarning kind, const std::string &message);
+	std::string warning_location();
 
 	struct StageIOMember
 	{
@@ -170,6 +221,7 @@ private:
 
 	std::string get_inner_entry_point_name() const;
 	std::string scalar_type_name(const SPIRType &type) const;
+	static std::string base_type_name(const SPIRType &type);
 	std::string address_space(StorageClass storage) const;
 	std::string ptr_type(const SPIRType &pointee, StorageClass storage, uint32_t id);
 	std::string to_sampler_expression(uint32_t id);
@@ -184,6 +236,8 @@ private:
 	bool member_is_atomic(uint32_t type_id, uint32_t index) const;
 	bool variable_is_atomic(uint32_t var_id) const;
 	void analyze_atomics();
+	void analyze_transient_16bit_integers();
+	bool is_16bit_integer_type(uint32_t type_id) const;
 	void mark_atomic_pointer(uint32_t ptr_id);
 	std::string wrap_atomic(const SPIRType &type, const std::string &base);
 	std::string image_format_to_wgsl(ImageFormat fmt) const;
@@ -200,6 +254,8 @@ private:
 	void emit_select_op(uint32_t result_type, uint32_t id, uint32_t cond, uint32_t true_value, uint32_t false_value);
 	void require_enable(bool &flag);
 	std::string get_entry_point_wrapper_name() const;
+	bool is_library_export(uint32_t func_id) const;
+	bool implicit_lod_allowed() const;
 
 	// Pointer parameters which need to be dereferenced when used as expressions.
 	std::unordered_set<uint32_t> pointer_parameters;
@@ -216,6 +272,11 @@ private:
 	bool requires_clip_distances = false;
 	bool requires_dual_source_blending = false;
 	bool uses_implicit_derivatives = false;
+	bool requires_non_finite_helper = false;
+
+	// WGSL has no 16-bit integers. If they are only used as truncated intermediates of int to float conversions,
+	// they are carried in 32-bit integers.
+	bool lower_transient_16bit_integers = false;
 
 	uint32_t clip_distance_count = 0;
 };

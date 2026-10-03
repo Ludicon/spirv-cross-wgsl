@@ -1,0 +1,18 @@
+fn add_one(x : u32) -> u32
+{
+    return x + 1u;
+}
+
+fn add_three(z : u32) -> u32
+{
+    return z + 3u;
+}
+
+fn add_two(y : u32) -> u32
+{
+    var _16 : u32 = y;
+    var _17 : u32 = add_one(_16);
+    var _18 : u32 = add_one(_17);
+    return add_three(_18);
+}
+

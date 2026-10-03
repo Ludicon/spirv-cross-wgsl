@@ -1,0 +1,17 @@
+fn add_one(x : u32) -> u32
+{
+    return x + 1u;
+}
+
+fn helper_add(a : u32, b : u32) -> u32
+{
+    return a + b;
+}
+
+fn add_two(y : u32) -> u32
+{
+    var _22 : u32 = y;
+    var _23 : u32 = 2u;
+    return helper_add(_22, _23);
+}
+

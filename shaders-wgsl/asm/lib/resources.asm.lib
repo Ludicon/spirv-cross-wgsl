@@ -1,0 +1,157 @@
+; SPIR-V
+; Version: 1.5
+; Generator: Google spiregg; 0
+; Bound: 99
+; Schema: 0
+               OpCapability MinLod
+               OpCapability StorageImageWriteWithoutFormat
+               OpCapability StorageImageReadWithoutFormat
+               OpCapability InterpolationFunction
+               OpCapability Linkage
+               OpCapability Shader
+               OpExtension "SPV_GOOGLE_user_type"
+               OpExtension "SPV_GOOGLE_hlsl_functionality1"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpSource HLSL 630
+               OpName %2 "type.2d.image"
+               OpName %3 "g_texture"
+               OpName %4 "type.sampler"
+               OpName %5 "g_sampler"
+               OpName %6 "type.RWStructuredBuffer.uint"
+               OpName %7 "g_output"
+               OpName %8 "weights"
+               OpName %9 "Block"
+               OpMemberName %9 0 "color"
+               OpMemberName %9 1 "index"
+               OpName %10 "load_block"
+               OpName %11 "uv"
+               OpName %12 "index"
+               OpName %13 "bb.entry"
+               OpName %14 "type.sampled.image"
+               OpName %15 "encode"
+               OpName %16 "b"
+               OpName %17 "packed"
+               OpName %18 "error"
+               OpName %19 "bb.entry"
+               OpDecorate %10 LinkageAttributes "load_block" Export
+               OpDecorate %15 LinkageAttributes "encode" Export
+               OpDecorate %3 DescriptorSet 0
+               OpDecorate %3 Binding 0
+               OpDecorate %5 DescriptorSet 0
+               OpDecorate %5 Binding 0
+               OpDecorate %7 DescriptorSet 0
+               OpDecorate %7 Binding 1
+               OpDecorateString %3 UserTypeGOOGLE "texture2d:<float4>"
+               OpDecorate %20 ArrayStride 4
+               OpMemberDecorate %6 0 Offset 0
+               OpDecorate %6 Block
+               OpDecorateString %7 UserTypeGOOGLE "rwstructuredbuffer:<uint>"
+         %21 = OpTypeFloat 32
+         %22 = OpConstant %21 0.099999994
+         %23 = OpConstant %21 0.199999988
+         %24 = OpConstant %21 0.299999982
+         %25 = OpConstant %21 0.399999976
+         %26 = OpTypeInt 32 0
+         %27 = OpConstant %26 4
+         %28 = OpTypeArray %21 %27
+         %29 = OpConstantComposite %28 %22 %23 %24 %25
+         %30 = OpConstant %21 0
+         %31 = OpTypeInt 32 1
+         %32 = OpConstant %31 0
+         %33 = OpConstant %31 1
+         %34 = OpConstant %26 16
+         %35 = OpConstant %26 0
+         %36 = OpConstant %26 3
+         %37 = OpConstant %26 1
+          %2 = OpTypeImage %21 2D 2 0 0 1 Unknown
+         %38 = OpTypePointer UniformConstant %2
+          %4 = OpTypeSampler
+         %39 = OpTypePointer UniformConstant %4
+         %20 = OpTypeRuntimeArray %26
+          %6 = OpTypeStruct %20
+         %40 = OpTypePointer StorageBuffer %6
+         %41 = OpTypeVector %21 4
+          %9 = OpTypeStruct %41 %26
+         %42 = OpTypeVector %21 2
+         %43 = OpTypePointer Function %42
+         %44 = OpTypePointer Function %26
+         %45 = OpTypeFunction %9 %43 %44
+         %46 = OpTypePointer Function %9
+         %14 = OpTypeSampledImage %2
+         %47 = OpTypePointer Function %41
+         %48 = OpTypeVoid
+         %49 = OpTypeVector %26 2
+         %50 = OpTypePointer Function %49
+         %51 = OpTypePointer Function %21
+         %52 = OpTypeFunction %48 %46 %50 %51
+         %53 = OpTypePointer StorageBuffer %26
+         %54 = OpTypeBool
+          %3 = OpVariable %38 UniformConstant
+          %5 = OpVariable %39 UniformConstant
+          %7 = OpVariable %40 StorageBuffer
+         %55 = OpTypePointer Function %28
+         %10 = OpFunction %9 None %45
+         %11 = OpFunctionParameter %43
+         %12 = OpFunctionParameter %44
+         %13 = OpLabel
+          %8 = OpVariable %55 Function %29
+         %56 = OpLoad %2 %3
+         %57 = OpLoad %4 %5
+         %58 = OpLoad %42 %11
+         %59 = OpSampledImage %14 %56 %57
+         %60 = OpImageSampleExplicitLod %41 %59 %58 Lod %30
+         %61 = OpLoad %26 %12
+               OpBranch %62
+         %62 = OpLabel
+         %63 = OpPhi %21 %30 %13 %64 %65
+         %66 = OpPhi %26 %35 %13 %67 %65
+         %68 = OpULessThan %54 %66 %61
+               OpLoopMerge %69 %65 None
+               OpBranchConditional %68 %65 %69
+         %65 = OpLabel
+         %70 = OpBitwiseAnd %26 %66 %36
+         %71 = OpAccessChain %51 %8 %70
+         %72 = OpLoad %21 %71
+         %64 = OpFAdd %21 %63 %72
+         %67 = OpIAdd %26 %66 %37
+               OpBranch %62
+         %69 = OpLabel
+         %73 = OpVectorTimesScalar %41 %60 %63
+         %74 = OpLoad %26 %12
+         %75 = OpCompositeConstruct %9 %73 %74
+               OpReturnValue %75
+               OpFunctionEnd
+         %15 = OpFunction %48 None %52
+         %16 = OpFunctionParameter %46
+         %17 = OpFunctionParameter %50
+         %18 = OpFunctionParameter %51
+         %19 = OpLabel
+         %76 = OpAccessChain %47 %16 %32
+         %77 = OpAccessChain %51 %16 %32 %32
+         %78 = OpLoad %21 %77
+         %79 = OpCompositeConstruct %42 %78 %30
+         %80 = OpExtInst %26 %1 PackHalf2x16 %79
+         %81 = OpAccessChain %51 %16 %32 %33
+         %82 = OpLoad %21 %81
+         %83 = OpCompositeConstruct %42 %82 %30
+         %84 = OpExtInst %26 %1 PackHalf2x16 %83
+         %85 = OpShiftLeftLogical %26 %84 %34
+         %86 = OpBitwiseOr %26 %80 %85
+         %87 = OpAccessChain %44 %16 %33
+         %88 = OpLoad %26 %87
+         %89 = OpCompositeConstruct %49 %86 %88
+               OpStore %17 %89
+         %90 = OpLoad %41 %76
+         %91 = OpLoad %41 %76
+         %92 = OpDot %21 %90 %91
+         %93 = OpLoad %21 %18
+         %94 = OpFAdd %21 %93 %92
+               OpStore %18 %94
+         %95 = OpAccessChain %44 %17 %32
+         %96 = OpLoad %26 %95
+         %97 = OpLoad %26 %87
+         %98 = OpAccessChain %53 %7 %32 %97
+               OpStore %98 %96
+               OpReturn
+               OpFunctionEnd

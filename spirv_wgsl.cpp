@@ -26,6 +26,8 @@
 #include <algorithm>
 #include <assert.h>
 #include <functional>
+#include <cmath>
+#include <stdio.h>
 #include <string.h>
 
 using namespace SPIRV_CROSS_SPV_HEADER_NAMESPACE;
@@ -99,16 +101,18 @@ string CompilerWGSL::compile()
 		SPIRV_CROSS_THROW("WGSL only supports vertex, fragment and compute shaders.");
 	}
 
-	if (ir.is_library_module)
-		SPIRV_CROSS_THROW("WGSL does not support library modules.");
-
 	// WGSL does not support function overloading, so make sure all function names are unique.
+	// In library modules, exported functions claim their names first so that they are preserved.
 	{
 		unordered_set<string> function_names;
+		if (ir.is_library_module)
+			for (auto export_id : ir.library_exported_functions)
+				function_names.insert(to_name(export_id));
+
 		ir.for_each_typed_id<SPIRFunction>(
 		    [&](uint32_t id, SPIRFunction &)
 		    {
-			    if (id == ir.default_entry_point)
+			    if (ir.is_library_module ? is_library_export(id) : id == ir.default_entry_point)
 				    return;
 			    auto name = to_name(id);
 			    if (function_names.count(name))
@@ -129,6 +133,7 @@ string CompilerWGSL::compile()
 	update_active_builtins();
 	analyze_image_and_sampler_usage();
 	analyze_atomics();
+	analyze_transient_16bit_integers();
 	prepare_buffer_layouts();
 
 	uint32_t pass_count = 0;
@@ -140,11 +145,23 @@ string CompilerWGSL::compile()
 		buffer.reset();
 
 		pointer_parameters.clear();
+		warnings.clear();
 
 		emit_header();
 		emit_resources();
-		emit_function(get<SPIRFunction>(ir.default_entry_point), Bitset());
-		emit_entry_point_wrapper();
+
+		if (ir.is_library_module)
+		{
+			// Emit each exported function as a free function. emit_function recursively emits callees,
+			// so internal helpers are picked up too.
+			for (auto export_id : ir.library_exported_functions)
+				emit_function(get<SPIRFunction>(export_id), Bitset());
+		}
+		else
+		{
+			emit_function(get<SPIRFunction>(ir.default_entry_point), Bitset());
+			emit_entry_point_wrapper();
+		}
 
 		pass_count++;
 	} while (is_forcing_recompilation());
@@ -161,6 +178,19 @@ void CompilerWGSL::require_enable(bool &flag)
 	}
 }
 
+bool CompilerWGSL::is_library_export(uint32_t func_id) const
+{
+	auto &exports = ir.library_exported_functions;
+	return find(exports.begin(), exports.end(), FunctionID(func_id)) != exports.end();
+}
+
+bool CompilerWGSL::implicit_lod_allowed() const
+{
+	// Library functions may be called from any stage. WGSL only enforces the fragment stage restriction of
+	// implicit LOD sampling for functions reachable from an entry point, so keep the source semantics.
+	return ir.is_library_module || get_entry_point().model == ExecutionModelFragment;
+}
+
 string CompilerWGSL::get_entry_point_wrapper_name() const
 {
 	auto &name = get_entry_point().name;
@@ -170,6 +200,67 @@ string CompilerWGSL::get_entry_point_wrapper_name() const
 		if (!isalnum(static_cast<unsigned char>(c)) && c != '_')
 			valid = false;
 	return valid ? name : "main";
+}
+
+static const char *const warning_names[WGSL_WARNING_COUNT] = {
+	"non-finite-constant",
+	"depth-compare-lod",
+	"ignored-bias",
+	"weak-compare-exchange",
+	"ignored-builtin",
+};
+
+const char *CompilerWGSL::get_warning_name(WGSLWarning kind)
+{
+	return kind < WGSL_WARNING_COUNT ? warning_names[kind] : "unknown";
+}
+
+bool CompilerWGSL::get_warning_from_name(const string &name, WGSLWarning &kind)
+{
+	for (uint32_t i = 0; i < WGSL_WARNING_COUNT; i++)
+	{
+		if (name == warning_names[i])
+		{
+			kind = WGSLWarning(i);
+			return true;
+		}
+	}
+	return false;
+}
+
+void CompilerWGSL::set_warning_enabled(WGSLWarning kind, bool enabled)
+{
+	if (enabled)
+		disabled_warnings &= ~(1u << kind);
+	else
+		disabled_warnings |= 1u << kind;
+}
+
+bool CompilerWGSL::is_warning_enabled(WGSLWarning kind) const
+{
+	return (disabled_warnings & (1u << kind)) == 0;
+}
+
+string CompilerWGSL::warning_location()
+{
+	if (!current_function)
+		return "at module scope";
+	if (!ir.is_library_module && current_function->self == ir.default_entry_point)
+		return join("in function '", get_inner_entry_point_name(), "'");
+	return join("in function '", to_name(current_function->self), "'");
+}
+
+void CompilerWGSL::warn(WGSLWarning kind, const string &message)
+{
+	if (!is_warning_enabled(kind))
+		return;
+
+	// The same construct may be visited several times, e.g. once for every use of a constant.
+	for (auto &w : warnings)
+		if (w.kind == kind && w.message == message)
+			return;
+
+	warnings.push_back({ kind, message });
 }
 
 string CompilerWGSL::get_inner_entry_point_name() const
@@ -222,6 +313,16 @@ void CompilerWGSL::emit_header()
 
 void CompilerWGSL::emit_helper_functions()
 {
+	if (requires_non_finite_helper)
+	{
+		// WGSL rejects infinity and NaN in constant expressions, but function calls are evaluated at runtime.
+		statement("fn spvNonFinite(bits : u32) -> f32");
+		begin_scope();
+		statement("return bitcast<f32>(bits);");
+		end_scope();
+		statement("");
+	}
+
 	if (requires_inverse_2x2)
 	{
 		statement("fn spvInverse2x2(m : mat2x2f) -> mat2x2f");
@@ -716,8 +817,43 @@ string CompilerWGSL::scalar_type_name(const SPIRType &type) const
 	case SPIRType::Half:
 		return "f16";
 	default:
-		SPIRV_CROSS_THROW("Scalar type is not supported in WGSL.");
+		SPIRV_CROSS_THROW(join("Scalar type ", base_type_name(type), " is not supported in WGSL."));
 	}
+}
+
+string CompilerWGSL::base_type_name(const SPIRType &type)
+{
+	switch (type.basetype)
+	{
+	case SPIRType::SByte:
+		return "int8";
+	case SPIRType::UByte:
+		return "uint8";
+	case SPIRType::Short:
+		return "int16";
+	case SPIRType::UShort:
+		return "uint16";
+	case SPIRType::Int64:
+		return "int64";
+	case SPIRType::UInt64:
+		return "uint64";
+	case SPIRType::Double:
+		return "double";
+	case SPIRType::BFloat16:
+		return "bfloat16";
+	case SPIRType::AtomicCounter:
+		return "atomic counter";
+	case SPIRType::AccelerationStructure:
+		return "acceleration structure";
+	case SPIRType::RayQuery:
+		return "ray query";
+	default:
+		break;
+	}
+
+	if (type.op == OpTypeCooperativeMatrixKHR)
+		return "cooperative matrix";
+	return join("(base type ", uint32_t(type.basetype), ")");
 }
 
 string CompilerWGSL::type_to_glsl(const SPIRType &type, uint32_t id)
@@ -769,8 +905,19 @@ string CompilerWGSL::type_to_glsl(const SPIRType &type, uint32_t id)
 	case SPIRType::Float:
 		break;
 
+	case SPIRType::Short:
+	case SPIRType::UShort:
+		if (lower_transient_16bit_integers)
+		{
+			auto wide_type = type;
+			wide_type.basetype = type.basetype == SPIRType::Short ? SPIRType::Int : SPIRType::UInt;
+			wide_type.width = 32;
+			return type_to_glsl(wide_type, id);
+		}
+		SPIRV_CROSS_THROW(join("Type ", base_type_name(type), " is not supported in WGSL."));
+
 	default:
-		SPIRV_CROSS_THROW("Type is not supported in WGSL.");
+		SPIRV_CROSS_THROW(join("Type ", base_type_name(type), " is not supported in WGSL."));
 	}
 
 	string scalar = scalar_type_name(type);
@@ -1217,6 +1364,48 @@ string CompilerWGSL::bitcast_glsl_op(const SPIRType &out_type, const SPIRType &i
 	return join("bitcast<", type_to_glsl(out_type), ">");
 }
 
+string CompilerWGSL::non_finite_float_expression(uint32_t bits)
+{
+	require_enable(requires_non_finite_helper);
+
+	const char *description = "nan";
+	if (bits == 0x7f800000u)
+		description = "inf";
+	else if (bits == 0xff800000u)
+		description = "-inf";
+
+	warn(WGSL_WARNING_NON_FINITE_CONSTANT,
+	     join("Constant ", description, " ", warning_location(),
+	          " is computed at runtime with spvNonFinite(), since WGSL does not allow infinity or NaN in "
+	          "constant expressions.",
+	          current_function ? "" : " Module scope constants cannot call functions, so the output will not validate."));
+
+	char print_buffer[32];
+	snprintf(print_buffer, sizeof(print_buffer), "0x%xu", bits);
+	return join("spvNonFinite(", print_buffer, " /* ", description, " */)");
+}
+
+string CompilerWGSL::convert_float_to_string(const SPIRConstant &c, uint32_t col, uint32_t row)
+{
+	float value = c.scalar_f32(col, row);
+	if (get<SPIRType>(c.constant_type).basetype == SPIRType::Float && (std::isnan(value) || std::isinf(value)))
+		return non_finite_float_expression(c.scalar(col, row));
+	return CompilerGLSL::convert_float_to_string(c, col, row);
+}
+
+string CompilerWGSL::convert_half_to_string(const SPIRConstant &c, uint32_t col, uint32_t row)
+{
+	if (get<SPIRType>(c.constant_type).basetype != SPIRType::Half)
+		return CompilerGLSL::convert_half_to_string(c, col, row);
+
+	float value = c.scalar_f16(col, row);
+	if (std::isinf(value))
+		return join("f16(", non_finite_float_expression(value > 0.0f ? 0x7f800000u : 0xff800000u), ")");
+	else if (std::isnan(value))
+		return join("f16(", non_finite_float_expression(0x7fc00000u), ")");
+	return join(format_float(value), "h");
+}
+
 string CompilerWGSL::to_ternary_expression(const SPIRType &, uint32_t select, uint32_t true_value, uint32_t false_value)
 {
 	return join("select(", to_unpacked_expression(false_value), ", ", to_unpacked_expression(true_value), ", ",
@@ -1255,7 +1444,7 @@ bool CompilerWGSL::skip_argument(uint32_t) const
 
 void CompilerWGSL::emit_function_prototype(SPIRFunction &func, const Bitset &)
 {
-	const bool is_entry_point = func.self == ir.default_entry_point;
+	const bool is_entry_point = !ir.is_library_module && func.self == ir.default_entry_point;
 	if (!is_entry_point)
 		add_function_overload(func);
 
@@ -1358,6 +1547,89 @@ void CompilerWGSL::emit_sampled_image_op(uint32_t result_type, uint32_t result_i
 static inline uint64_t atomic_member_key(uint32_t type_id, uint32_t index)
 {
 	return (uint64_t(type_id) << 32) | index;
+}
+
+bool CompilerWGSL::is_16bit_integer_type(uint32_t type_id) const
+{
+	if (ir.ids[type_id].get_type() != TypeType)
+		return false;
+	auto *type = &get<SPIRType>(type_id);
+	while (type->pointer && type->parent_type)
+		type = &get<SPIRType>(type->parent_type);
+	return type->basetype == SPIRType::Short || type->basetype == SPIRType::UShort;
+}
+
+void CompilerWGSL::analyze_transient_16bit_integers()
+{
+	// dxc lowers e.g. half(uint_value) to OpUConvert to a 16-bit integer followed by OpConvertUToF.
+	// If every 16-bit integer value is produced by a conversion from a 32-bit integer and only consumed
+	// by int to float conversions, the 16-bit values can be represented exactly with 32-bit integers.
+	lower_transient_16bit_integers = false;
+	unordered_set<uint32_t> values;
+	bool found = false;
+
+	for (auto &id : ir.ids)
+	{
+		if (id.get_type() != TypeFunction)
+			continue;
+		auto &func = id.get<SPIRFunction>();
+		for (auto &arg : func.arguments)
+			if (is_16bit_integer_type(arg.type))
+				return;
+		if (is_16bit_integer_type(func.return_type))
+			return;
+
+		for (auto block_id : func.blocks)
+		{
+			for (auto &i : get<SPIRBlock>(block_id).ops)
+			{
+				auto *ops = stream(i);
+				auto op = static_cast<Op>(i.op);
+				if (i.length < 2 || !is_16bit_integer_type(ops[0]))
+					continue;
+
+				found = true;
+				if (op != OpUConvert && op != OpSConvert)
+					return;
+				values.insert(ops[1]);
+			}
+		}
+	}
+
+	if (!found)
+		return;
+
+	for (auto &id : ir.ids)
+	{
+		if (id.get_type() != TypeFunction)
+			continue;
+		auto &func = id.get<SPIRFunction>();
+		for (auto block_id : func.blocks)
+		{
+			auto &block = get<SPIRBlock>(block_id);
+			for (auto &i : block.ops)
+			{
+				auto *ops = stream(i);
+				auto op = static_cast<Op>(i.op);
+				bool allowed_use = op == OpConvertUToF || op == OpConvertSToF;
+				bool produces_16bit = i.length >= 2 && is_16bit_integer_type(ops[0]);
+				for (uint32_t j = 0; j < i.length; j++)
+				{
+					// Skip the result ID of the conversions which produce the 16-bit values.
+					if (j == 1 && produces_16bit)
+						continue;
+					if (values.count(ops[j]) && !(allowed_use && j == 2))
+						return;
+				}
+			}
+
+			// Values used as branch conditions, return values, etc.
+			if (values.count(block.condition) || values.count(block.return_value))
+				return;
+		}
+	}
+
+	lower_transient_16bit_integers = true;
 }
 
 void CompilerWGSL::analyze_atomics()
@@ -2363,11 +2635,21 @@ void CompilerWGSL::add_stage_io_builtin(SmallVector<StageIOMember> &members, Bui
 	auto name = wgsl_builtin_name(builtin, storage);
 	if (name.empty())
 	{
-		// Some builtins are written but have no equivalent in WGSL. They are silently ignored.
-		if (builtin == BuiltInPointSize || (builtin == BuiltInPosition && storage == StorageClassInput))
+		// Some builtins are written but have no equivalent in WGSL. They are ignored.
+		if (builtin == BuiltInPointSize)
+		{
+			warn(WGSL_WARNING_IGNORED_BUILTIN, "gl_PointSize is written, but ignored since WGSL always renders points with size 1.");
+			return;
+		}
+		if (builtin == BuiltInPosition && storage == StorageClassInput)
 			return;
 		if (builtin == BuiltInClipDistance)
+		{
+			warn(WGSL_WARNING_IGNORED_BUILTIN,
+			     storage == StorageClassInput ? "gl_ClipDistance input is not available in WGSL and reads as zero." :
+			                                    "gl_ClipDistance is written, but ignored outside of vertex shaders.");
 			return;
+		}
 		SPIRV_CROSS_THROW(join("Builtin ", builtin_to_glsl(builtin, storage), " is not supported in WGSL."));
 	}
 
@@ -2626,7 +2908,7 @@ static string component_expression(const string &enclosed, uint32_t vecsize, uin
 
 string CompilerWGSL::to_function_name(const TextureFunctionNameArguments &args)
 {
-	bool implicit_lod = get_entry_point().model == ExecutionModelFragment;
+	bool implicit_lod = implicit_lod_allowed();
 	if (implicit_lod && !args.base.is_fetch && !args.base.is_gather && !args.lod && !args.has_grad)
 		require_enable(uses_implicit_derivatives);
 	if (args.base.is_fetch)
@@ -2646,9 +2928,27 @@ string CompilerWGSL::to_function_name(const TextureFunctionNameArguments &args)
 
 string CompilerWGSL::to_function_args(const TextureFunctionArguments &args, bool *p_forward)
 {
+	if (args.dref && !args.base.is_gather && !args.base.is_fetch)
+	{
+		auto *lod_constant = args.lod ? maybe_get<SPIRConstant>(args.lod) : nullptr;
+		bool zero_lod = lod_constant && !lod_constant->specialization && lod_constant->scalar_f32() == 0.0f;
+		if (args.grad_x || (args.lod && !zero_lod))
+		{
+			warn(WGSL_WARNING_DEPTH_COMPARE_LOD,
+			     join("Depth comparison with ", args.grad_x ? "explicit gradients" : "an explicit LOD", " ",
+			          warning_location(), " samples LOD 0, since WGSL only supports depth comparisons at LOD 0."));
+		}
+	}
+
+	if (args.bias && !implicit_lod_allowed())
+	{
+		warn(WGSL_WARNING_IGNORED_BIAS,
+		     join("LOD bias ", warning_location(), " is ignored, since WGSL only supports bias in fragment shaders."));
+	}
+
 	auto &imgtype = *args.base.imgtype;
 	uint32_t img = args.base.img;
-	bool implicit_lod = get_entry_point().model == ExecutionModelFragment;
+	bool implicit_lod = implicit_lod_allowed();
 	bool depth = is_depth_texture(img);
 
 	uint32_t dims = 2;
@@ -2906,6 +3206,12 @@ void CompilerWGSL::emit_atomic_op(const Instruction &instruction)
 		break;
 	case OpAtomicCompareExchange:
 	case OpAtomicCompareExchangeWeak:
+		if (opcode == OpAtomicCompareExchange)
+		{
+			warn(WGSL_WARNING_WEAK_COMPARE_EXCHANGE,
+			     join("Compare-exchange ", warning_location(),
+			          " is emitted as atomicCompareExchangeWeak(), which may fail spuriously."));
+		}
 		expr = join("atomicCompareExchangeWeak(", ptr_expr, ", ", value_expr(ops[7]), ", ", value_expr(ops[6]),
 		            ").old_value");
 		break;
@@ -3479,6 +3785,43 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 	case OpSelect:
 		emit_select_op(ops[0], ops[1], ops[2], ops[3], ops[4]);
 		break;
+
+	case OpUConvert:
+	case OpSConvert:
+	{
+		auto &out_type = get<SPIRType>(ops[0]);
+		if (lower_transient_16bit_integers && out_type.width == 16)
+		{
+			// Truncate to 16 bits (sign-extending for SConvert), but keep the value in a 32-bit integer.
+			auto &in_type = expression_type(ops[2]);
+			auto wide_type = out_type;
+			wide_type.width = 32;
+			string expr;
+			if (opcode == OpUConvert)
+			{
+				wide_type.basetype = SPIRType::UInt;
+				string value = to_enclosed_unpacked_expression(ops[2]);
+				if (in_type.basetype != SPIRType::UInt)
+					value = bitcast_expression(wide_type, in_type.basetype, value);
+				expr = join(value, " & ", splat(wide_type, "0xffffu"));
+			}
+			else
+			{
+				wide_type.basetype = SPIRType::Int;
+				string value = to_enclosed_unpacked_expression(ops[2]);
+				if (in_type.basetype != SPIRType::Int)
+					value = bitcast_expression(wide_type, in_type.basetype, value);
+				auto shift_type = wide_type;
+				shift_type.basetype = SPIRType::UInt;
+				expr = join("(", value, " << ", splat(shift_type, "16u"), ") >> ", splat(shift_type, "16u"));
+			}
+			emit_op(ops[0], ops[1], expr, should_forward(ops[2]));
+			inherit_expression_dependencies(ops[1], ops[2]);
+			break;
+		}
+		CompilerGLSL::emit_instruction(instruction);
+		break;
+	}
 
 	case OpBeginInvocationInterlockEXT:
 	case OpEndInvocationInterlockEXT:

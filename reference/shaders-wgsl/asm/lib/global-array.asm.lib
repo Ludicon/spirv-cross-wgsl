@@ -1,0 +1,7 @@
+const _15 : array<u32, 4> = array<u32, 4>(10u, 20u, 30u, 40u);
+
+fn lookup(i : u32) -> u32
+{
+    return _15[i];
+}
+
