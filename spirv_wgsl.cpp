@@ -2583,9 +2583,9 @@ void CompilerWGSL::resolve_binding_conflicts()
 		    if (!has_decoration(var.self, DecorationDescriptorSet) || !has_decoration(var.self, DecorationBinding))
 			    return;
 
-		    auto *type = &get_variable_data_type(var);
+		    const SPIRType *type = &get_variable_data_type(var);
 		    while (!type->array.empty())
-			    type = &get<SPIRType>(type->parent_type);
+			    type = &this->get<SPIRType>(type->parent_type);
 
 		    uint32_t group = get_decoration(var.self, DecorationDescriptorSet);
 		    uint32_t binding = get_decoration(var.self, DecorationBinding);
@@ -2812,7 +2812,7 @@ void CompilerWGSL::emit_resources()
 				    if (!active.get(builtin) || emitted_builtins.count(key))
 					    continue;
 				    emitted_builtins.insert(key);
-				    auto &member_type = get<SPIRType>(block_type.member_types[i]);
+				    auto &member_type = this->get<SPIRType>(block_type.member_types[i]);
 				    if (builtin == BuiltInClipDistance)
 					    clip_distance_count = member_type.array.empty() ? 1 : member_type.array.back();
 				    statement("var<private> ", builtin_to_glsl(builtin, var.storage), " : ", type_to_glsl(member_type),
