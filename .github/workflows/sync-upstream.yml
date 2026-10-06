@@ -48,7 +48,7 @@ jobs:
       - name: Fast-forward main to upstream
         run: gh repo sync "$GITHUB_REPOSITORY" --branch "$MIRROR_BRANCH"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.WORK_BRANCH }}
           fetch-depth: 0
