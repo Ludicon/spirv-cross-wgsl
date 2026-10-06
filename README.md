@@ -7,6 +7,19 @@
 
 SPIRV-Cross is a tool designed for parsing and converting SPIR-V to other shader languages.
 
+> [!NOTE]
+> This is [Ludicon](https://github.com/Ludicon)'s fork of [KhronosGroup/SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross).
+> It adds a WGSL (WebGPU Shading Language) backend, which is not part of upstream SPIRV-Cross. Everything else is
+> upstream SPIRV-Cross, and the fork is kept in sync with it:
+>
+> - `main` mirrors upstream `main` and is updated automatically.
+> - `wgsl` (the default branch) adds the WGSL backend on top of `main`.
+>
+> Use `spirv-cross --wgsl` to emit WGSL; `--help-wgsl` lists the WGSL specific options. The backend supports vertex,
+> fragment and compute shaders, and SPIR-V library modules. Generated code is validated with [Tint](https://dawn.googlesource.com/dawn/+/refs/heads/main/src/tint/).
+>
+> Please report WGSL issues in this repository, not upstream.
+
 [![CI](https://github.com/KhronosGroup/SPIRV-Cross/actions/workflows/main.yml/badge.svg)](https://github.com/KhronosGroup/SPIRV-Cross/actions/workflows/main.yml)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/KhronosGroup/SPIRV-Cross?svg=true&branch=main)](https://ci.appveyor.com/project/HansKristian-Work/SPIRV-Cross)
 
