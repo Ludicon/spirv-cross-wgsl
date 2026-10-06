@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Ignacio Castano
+ * Copyright 2026 Ludicon LLC
  * SPDX-License-Identifier: Apache-2.0 OR MIT
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
