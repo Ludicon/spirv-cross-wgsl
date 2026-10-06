@@ -19,6 +19,8 @@ SPIRV-Cross is a tool designed for parsing and converting SPIR-V to other shader
 > fragment and compute shaders, and SPIR-V library modules. Generated code is validated with [Tint](https://dawn.googlesource.com/dawn/+/refs/heads/main/src/tint/).
 >
 > Please report WGSL issues in this repository, not upstream.
+>
+> [![WGSL CI](https://github.com/Ludicon/spirv-cross-wgsl/actions/workflows/wgsl-ci.yml/badge.svg?branch=wgsl)](https://github.com/Ludicon/spirv-cross-wgsl/actions/workflows/wgsl-ci.yml?query=branch%3Awgsl)
 
 [![CI](https://github.com/KhronosGroup/SPIRV-Cross/actions/workflows/main.yml/badge.svg)](https://github.com/KhronosGroup/SPIRV-Cross/actions/workflows/main.yml)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/KhronosGroup/SPIRV-Cross?svg=true&branch=main)](https://ci.appveyor.com/project/HansKristian-Work/SPIRV-Cross)
