@@ -86,15 +86,14 @@ string CompilerWGSL::compile()
 	backend.supports_extensions = false;
 	backend.supports_empty_struct = false;
 	backend.support_64bit_switch = false;
-	backend.infinite_loop_header = "loop";
-	backend.support_do_while = false;
-	backend.merge_case_labels = true;
-	backend.switch_requires_default = true;
-	backend.support_complex_for_loop = false;
-	backend.int32_min_literal = "i32(-2147483648)";
-	backend.strip_condition_parentheses = true;
+	control_flow.infinite_loop_header = "loop";
+	control_flow.support_do_while = false;
+	control_flow.merge_case_labels = true;
+	control_flow.switch_requires_default = true;
+	control_flow.support_complex_for_loop = false;
+	control_flow.strip_condition_parentheses = true;
 	// Switch cases never fall through in WGSL, reaching the end of a case exits the switch.
-	backend.unreachable_requires_switch_break = false;
+	control_flow.unreachable_requires_switch_break = false;
 
 	auto &execution = get_entry_point();
 	if (execution.model != ExecutionModelVertex && execution.model != ExecutionModelFragment &&
@@ -1404,6 +1403,17 @@ string CompilerWGSL::convert_float_to_string(const SPIRConstant &c, uint32_t col
 	if (get<SPIRType>(c.constant_type).basetype == SPIRType::Float && (std::isnan(value) || std::isinf(value)))
 		return non_finite_float_expression(c.scalar(col, row));
 	return CompilerGLSL::convert_float_to_string(c, col, row);
+}
+
+string CompilerWGSL::constant_expression_vector(const SPIRConstant &c, uint32_t vector)
+{
+	// The GLSL backend emits INT32_MIN as int(0x80000000), since negating a decimal literal may promote it to a
+	// wider type. In WGSL the literal is an AbstractInt, so i32(-2147483648) is exact.
+	auto expr = CompilerGLSL::constant_expression_vector(c, vector);
+	static const string glsl_int_min = "int(0x80000000)";
+	for (size_t pos = expr.find(glsl_int_min); pos != string::npos; pos = expr.find(glsl_int_min, pos))
+		expr.replace(pos, glsl_int_min.size(), "i32(-2147483648)");
+	return expr;
 }
 
 string CompilerWGSL::convert_half_to_string(const SPIRConstant &c, uint32_t col, uint32_t row)

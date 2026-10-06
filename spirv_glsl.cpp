@@ -5660,15 +5660,15 @@ string CompilerGLSL::address_of_expression(const std::string &expr)
 		return join('&', enclose_expression(expr));
 }
 
-// Just like to_expression except that we enclose the expression inside parentheses if needed.
 string CompilerGLSL::to_condition_expression(uint32_t id)
 {
 	auto expr = to_expression(id);
-	if (backend.strip_condition_parentheses)
+	if (control_flow.strip_condition_parentheses)
 		strip_enclosed_expression(expr);
 	return expr;
 }
 
+// Just like to_expression except that we enclose the expression inside parentheses if needed.
 string CompilerGLSL::to_enclosed_expression(uint32_t id, bool register_expression_read)
 {
 	return enclose_expression(to_expression(id, register_expression_read));
@@ -6772,13 +6772,6 @@ string CompilerGLSL::convert_float_to_string(const SPIRConstant &c, uint32_t col
 	return res;
 }
 
-std::string CompilerGLSL::int32_to_string(int32_t value) const
-{
-	if (value == (std::numeric_limits<int32_t>::min)())
-		return backend.int32_min_literal;
-	return convert_to_string(value);
-}
-
 std::string CompilerGLSL::convert_double_to_string(const SPIRConstant &c, uint32_t col, uint32_t row)
 {
 	string res;
@@ -7126,7 +7119,7 @@ string CompilerGLSL::constant_expression_vector(const SPIRConstant &c, uint32_t 
 
 	case SPIRType::Int:
 		if (splat)
-			res += int32_to_string(c.scalar_i32(vector, 0));
+			res += convert_to_string(c.scalar_i32(vector, 0));
 		else
 		{
 			for (uint32_t i = 0; i < c.vector_size(); i++)
@@ -7134,7 +7127,7 @@ string CompilerGLSL::constant_expression_vector(const SPIRConstant &c, uint32_t 
 				if (c.vector_size() > 1 && c.specialization_constant_id(vector, i) != 0)
 					res += to_expression(c.specialization_constant_id(vector, i));
 				else
-					res += int32_to_string(c.scalar_i32(vector, i));
+					res += convert_to_string(c.scalar_i32(vector, i));
 				if (i + 1 < c.vector_size())
 					res += ", ";
 			}
@@ -18707,7 +18700,7 @@ string CompilerGLSL::emit_for_loop_initializers(const SPIRBlock &block)
 		return variable_decl(get<SPIRVariable>(block.loop_variables.front()));
 	}
 	else if (!same_types || missing_initializers == uint32_t(block.loop_variables.size()) ||
-	         (!backend.support_complex_for_loop && block.loop_variables.size() - missing_initializers > 1))
+	         (!control_flow.support_complex_for_loop && block.loop_variables.size() - missing_initializers > 1))
 	{
 		for (auto &loop_var : block.loop_variables)
 		{
@@ -18836,7 +18829,7 @@ bool CompilerGLSL::attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method 
 				if (method != SPIRBlock::MergeToSelectContinueForLoop)
 				{
 					auto continue_block = emit_continue_block(block.continue_block, false, false);
-					if (!backend.support_complex_for_loop && continue_block_statement_count > 1)
+					if (!control_flow.support_complex_for_loop && continue_block_statement_count > 1)
 					{
 						block.disable_block_optimization = true;
 						force_recompile();
@@ -18928,7 +18921,7 @@ bool CompilerGLSL::attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method 
 				}
 
 				auto continue_block = emit_continue_block(block.continue_block, false, false);
-				if (!backend.support_complex_for_loop && continue_block_statement_count > 1)
+				if (!control_flow.support_complex_for_loop && continue_block_statement_count > 1)
 				{
 					block.disable_block_optimization = true;
 					force_recompile();
@@ -19174,7 +19167,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 		// for (;;) { create-temporary; break; } consume-temporary;
 		// so force-declare temporaries here.
 		emit_hoisted_temporaries(block.potential_declare_temporary);
-		statement(backend.support_do_while ? "do" : backend.infinite_loop_header);
+		statement(control_flow.support_do_while ? "do" : control_flow.infinite_loop_header);
 		begin_scope();
 
 		emit_block_instructions(block);
@@ -19195,7 +19188,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 		// so force-declare temporaries here.
 		emit_hoisted_temporaries(block.potential_declare_temporary);
 		emit_block_hints(block);
-		statement(backend.infinite_loop_header);
+		statement(control_flow.infinite_loop_header);
 		begin_scope();
 
 		emit_block_instructions(block);
@@ -19481,7 +19474,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 					statement("for (int spvDummy", counter, " = 0; spvDummy", counter, " < 1; spvDummy", counter,
 					          "++)");
 				}
-				else if (backend.support_do_while)
+				else if (control_flow.support_do_while)
 					statement("do");
 				else
 				{
@@ -19525,7 +19518,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 					statement((i ? "else " : ""), "if (", to_legacy_case_label(block.condition, literals, label_suffix),
 					          ")");
 				}
-				else if (backend.merge_case_labels)
+				else if (control_flow.merge_case_labels)
 				{
 					SmallVector<string> labels;
 					for (auto &case_literal : literals)
@@ -19574,7 +19567,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 		bool need_fallthrough_block = block.default_block == block.next_block || !literals_to_merge.empty();
 		if (!collapsed_switch && ((header_merge_requires_phi && need_fallthrough_block) || !literals_to_merge.empty()))
 		{
-			if (backend.merge_case_labels)
+			if (control_flow.merge_case_labels)
 			{
 				SmallVector<string> labels;
 				for (auto &case_literal : literals_to_merge)
@@ -19607,7 +19600,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 			end_scope();
 		}
 
-		if (!collapsed_switch && !block_like_switch && !is_legacy() && backend.switch_requires_default &&
+		if (!collapsed_switch && !block_like_switch && !is_legacy() && control_flow.switch_requires_default &&
 		    !emitted_default_label)
 		{
 			statement("default:");
@@ -19620,7 +19613,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 		{
 			if ((block_like_switch || is_legacy()) && !is_legacy_es())
 			{
-				if (block_like_switch && !is_legacy() && !backend.support_do_while)
+				if (block_like_switch && !is_legacy() && !control_flow.support_do_while)
 				{
 					end_scope();
 					end_scope();
@@ -19741,7 +19734,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 			id = cfg.get_immediate_dominator(id);
 		}
 
-		if (inner_dominator_is_switch && backend.unreachable_requires_switch_break)
+		if (inner_dominator_is_switch && control_flow.unreachable_requires_switch_break)
 			statement("break; // unreachable workaround");
 
 		emit_next_block = false;
@@ -19867,7 +19860,7 @@ BlockID CompilerGLSL::emit_block_chain_inner(SPIRBlock &block)
 			if (!positive_test)
 				condition = join("!", enclose_expression(condition));
 
-			if (backend.support_do_while)
+			if (control_flow.support_do_while)
 				end_scope_decl(join("while (", condition, ")"));
 			else
 			{

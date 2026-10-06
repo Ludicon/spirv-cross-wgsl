@@ -685,24 +685,6 @@ protected:
 		bool implicit_c_integer_promotion_rules = false;
 		bool supports_spec_constant_array_size = true;
 		bool requires_phi_undef_zero_init = false;
-		// Loop header used for loops without a recognizable for/while pattern.
-		const char *infinite_loop_header = "for (;;)";
-		// If false, do-while loops are emitted as loop { ... continuing { break if !cond; } }
-		// and block-like switches as switch (0) { default: { ... } } (WGSL style).
-		bool support_do_while = true;
-		// If true, multiple case labels which share a block are emitted as "case a, b:".
-		bool merge_case_labels = false;
-		// If true, every switch statement must have a default label.
-		bool switch_requires_default = false;
-		// If false, for loops can only have a single initializer and a single continue statement.
-		bool support_complex_for_loop = true;
-		// Literal used for INT32_MIN, since negating a decimal literal may promote it to a wider type.
-		const char *int32_min_literal = "int(0x80000000)";
-		// If true, redundant parentheses around if, for and while conditions are removed.
-		bool strip_condition_parentheses = false;
-		// If true, a break is emitted after an OpUnreachable merge inside a switch case, so that languages
-		// with case fallthrough do not fall into the next case, e.g. after "if (cond) break; else discard;".
-		bool unreachable_requires_switch_break = true;
 	} backend;
 
 	void emit_struct(SPIRType &type);
@@ -735,7 +717,6 @@ protected:
 	void emit_constant(const SPIRConstant &constant);
 	void emit_specialization_constant_op(const SPIRConstantOp &constant);
 	std::string emit_continue_block(uint32_t continue_block, bool follow_true_block, bool follow_false_block);
-	uint32_t continue_block_statement_count = 0;
 	bool attempt_emit_loop_header(SPIRBlock &block, SPIRBlock::Method method);
 
 	void branch(BlockID from, BlockID to);
@@ -859,7 +840,6 @@ protected:
 	std::string to_composite_constructor_expression(const SPIRType &parent_type, uint32_t id, bool block_like_type);
 	std::string to_rerolled_array_expression(const SPIRType &parent_type, const std::string &expr, const SPIRType &type);
 	std::string to_enclosed_expression(uint32_t id, bool register_expression_read = true);
-	std::string to_condition_expression(uint32_t id);
 	std::string to_unpacked_expression(uint32_t id, bool register_expression_read = true);
 	std::string to_unpacked_row_major_matrix_expression(uint32_t id);
 	std::string to_enclosed_unpacked_expression(uint32_t id, bool register_expression_read = true);
@@ -975,6 +955,34 @@ protected:
 
 	uint32_t statement_count = 0;
 
+	// Control flow syntax for languages which differ from GLSL, used by the WGSL backend.
+	// These are kept apart from BackendVariations, which upstream frequently extends, to simplify merges.
+	struct ControlFlowSyntax
+	{
+		// Loop header used for loops without a recognizable for/while pattern.
+		const char *infinite_loop_header = "for (;;)";
+		// If false, do-while loops are emitted as loop { ... continuing { break if !cond; } }
+		// and block-like switches as switch (0) { default: { ... } }.
+		bool support_do_while = true;
+		// If true, multiple case labels which share a block are emitted as "case a, b:".
+		bool merge_case_labels = false;
+		// If true, every switch statement must have a default label.
+		bool switch_requires_default = false;
+		// If false, for loops can only have a single initializer and a single continue statement.
+		bool support_complex_for_loop = true;
+		// If true, redundant parentheses around if, for and while conditions are removed.
+		bool strip_condition_parentheses = false;
+		// If true, a break is emitted after an OpUnreachable merge inside a switch case, so that languages
+		// with case fallthrough do not fall into the next case, e.g. after "if (cond) break; else discard;".
+		bool unreachable_requires_switch_break = true;
+	} control_flow;
+
+	// Number of statements in the last continue block emitted by emit_continue_block().
+	uint32_t continue_block_statement_count = 0;
+
+	// Like to_expression(), but strips redundant parentheses if control_flow.strip_condition_parentheses is set.
+	std::string to_condition_expression(uint32_t id);
+
 	inline bool is_legacy() const
 	{
 		return (options.es && options.version < 300) || (!options.es && options.version < 130);
@@ -1089,7 +1097,6 @@ protected:
 	virtual std::string convert_half_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
 	virtual std::string convert_float_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
 	std::string convert_double_to_string(const SPIRConstant &value, uint32_t col, uint32_t row);
-	std::string int32_to_string(int32_t value) const;
 
 	std::string convert_separate_image_to_expression(uint32_t id);
 

@@ -185,6 +185,7 @@ protected:
 	std::string declare_temporary(uint32_t result_type, uint32_t result_id) override;
 	std::string convert_half_to_string(const SPIRConstant &value, uint32_t col, uint32_t row) override;
 	std::string convert_float_to_string(const SPIRConstant &value, uint32_t col, uint32_t row) override;
+	std::string constant_expression_vector(const SPIRConstant &c, uint32_t vector) override;
 	std::string non_finite_float_expression(uint32_t bits);
 	void emit_subgroup_op(const Instruction &i) override;
 	bool skip_argument(uint32_t id) const override;
