@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   sync:
-    if: github.repository == 'Ludicon/SPIRV-Cross'
+    if: github.repository_owner == 'Ludicon'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
