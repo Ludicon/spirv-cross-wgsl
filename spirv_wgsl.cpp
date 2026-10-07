@@ -1739,12 +1739,28 @@ bool CompilerWGSL::is_16bit_integer_type(uint32_t type_id) const
 
 void CompilerWGSL::analyze_transient_16bit_integers()
 {
-	// dxc lowers e.g. half(uint_value) to OpUConvert to a 16-bit integer followed by OpConvertUToF.
-	// If every 16-bit integer value is produced by a conversion from a 32-bit integer and only consumed
-	// by int to float conversions, the 16-bit values can be represented exactly with 32-bit integers.
+	// WGSL has no 16-bit integers. Code which computes with them is rejected here, rather than when a 16-bit
+	// type name is emitted, since some expressions never emit their type and would silently be evaluated
+	// with 32 bits, without wrapping.
+	//
+	// The exception is dxc's lowering of e.g. half(uint_value) to OpUConvert to a 16-bit integer, followed by
+	// OpConvertUToF. If every 16-bit integer value is produced by a conversion from a 32-bit integer and only
+	// consumed by int to float conversions, the 16-bit values can be represented exactly with 32-bit integers.
+	//
+	// Declaring the Int16 capability or 16-bit types without computing with them is fine.
 	lower_transient_16bit_integers = false;
 	unordered_set<uint32_t> values;
-	bool found = false;
+
+	auto reject = [&](const SPIRFunction &func, const string &what) {
+		SPIRV_CROSS_THROW(join("16-bit integers are not supported in WGSL: function '", to_name(func.self), "' ", what,
+		                       ". Only truncations to 16 bits which are converted to floating point are supported."));
+	};
+
+	ir.for_each_typed_id<SPIRConstantOp>([&](uint32_t id, SPIRConstantOp &cop) {
+		if (is_16bit_integer_type(cop.basetype))
+			SPIRV_CROSS_THROW(join("16-bit integers are not supported in WGSL: specialization constant operation %", id,
+			                       " has a 16-bit integer type."));
+	});
 
 	for (auto &id : ir.ids)
 	{
@@ -1753,9 +1769,9 @@ void CompilerWGSL::analyze_transient_16bit_integers()
 		auto &func = id.get<SPIRFunction>();
 		for (auto &arg : func.arguments)
 			if (is_16bit_integer_type(arg.type))
-				return;
+				reject(func, join("has 16-bit integer parameter %", arg.id));
 		if (is_16bit_integer_type(func.return_type))
-			return;
+			reject(func, "returns a 16-bit integer");
 
 		for (auto block_id : func.blocks)
 		{
@@ -1766,15 +1782,14 @@ void CompilerWGSL::analyze_transient_16bit_integers()
 				if (i.length < 2 || !is_16bit_integer_type(ops[0]))
 					continue;
 
-				found = true;
 				if (op != OpUConvert && op != OpSConvert)
-					return;
+					reject(func, join("computes 16-bit integer value %", ops[1], " (opcode ", uint32_t(op), ")"));
 				values.insert(ops[1]);
 			}
 		}
 	}
 
-	if (!found)
+	if (values.empty())
 		return;
 
 	for (auto &id : ir.ids)
@@ -1797,13 +1812,13 @@ void CompilerWGSL::analyze_transient_16bit_integers()
 					if (j == 1 && produces_16bit)
 						continue;
 					if (values.count(ops[j]) && !(allowed_use && j == 2))
-						return;
+						reject(func, join("uses 16-bit integer value %", ops[j], " (opcode ", uint32_t(op), ")"));
 				}
 			}
 
 			// Values used as branch conditions, return values, etc.
 			if (values.count(block.condition) || values.count(block.return_value))
-				return;
+				reject(func, "branches on or returns a 16-bit integer value");
 		}
 	}
 
