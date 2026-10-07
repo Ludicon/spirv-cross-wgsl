@@ -75,7 +75,10 @@ jobs:
           tar -xzf "$RUNNER_TEMP"/Dawn-*-ubuntu-latest-Release.tar.gz -C "$RUNNER_TEMP"
           mkdir -p "$RUNNER_TEMP/tint"
           cp "$RUNNER_TEMP"/Dawn-*-ubuntu-latest-Release/bin/tint "$RUNNER_TEMP/tint/"
-          "$RUNNER_TEMP/tint/tint" --help > /dev/null
+          # Make sure tint works, since test_shaders.py silently skips validation when it's not found.
+          # (tint --help exits with an error, so validate a trivial shader instead.)
+          echo '@compute @workgroup_size(1) fn main() {}' > "$RUNNER_TEMP/smoke.wgsl"
+          "$RUNNER_TEMP/tint/tint" --format wgsl -o /dev/null "$RUNNER_TEMP/smoke.wgsl"
           echo "$RUNNER_TEMP/tint" >> "$GITHUB_PATH"
 
       - name: Configure SPIRV-Cross
