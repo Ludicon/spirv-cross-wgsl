@@ -167,7 +167,13 @@ jobs:
       - name: Test
         shell: bash
         run: |
-          "${{ matrix.binary }}" --version
+          # spirv-cross has no version flag (--version sets the GLSL version). --help prints the
+          # "Git commit: <version>" banner to stderr.
+          "${{ matrix.binary }}" --help 2> help.txt > /dev/null
+          head -1 help.txt
+          if [ -n "$TAG" ]; then
+            grep -q "^Git commit: $TAG " help.txt
+          fi
           "${{ matrix.binary }}" --wgsl tests-other/debug-lines.spv > /dev/null
           if [ "$RUNNER_OS" = "macOS" ]; then
             lipo -archs "${{ matrix.binary }}" | grep -q x86_64
