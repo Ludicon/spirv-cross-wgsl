@@ -9,6 +9,9 @@
 # Dawn's releases is installed first. WGSL output does not depend on the platform, so validating it on
 # one platform is enough.
 #
+# Unlike upstream's CI, the builds are not uploaded as artifacts. Binaries are only produced for macOS and
+# Windows, by the Release workflow.
+#
 # Upstream's main.yml is kept unmodified to avoid merge conflicts. It can be disabled in this
 # repository's Actions settings, since this workflow covers it.
 
@@ -95,11 +98,6 @@ jobs:
           cmake --build . --config Release --parallel 4
           cmake --build . --config Release --target install
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ matrix.platform }}-binaries
-          path: build/output
-
       - name: Test SPIRV-Cross
         shell: bash
         working-directory: ${{github.workspace}}/build
@@ -168,10 +166,6 @@ jobs:
           cmake --build . --config Release --parallel 4
           cmake --build . --config Release --target install
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ matrix.sdk }}-binaries
-          path: build/output
 
   reuse:
     name: "REUSE license check"
