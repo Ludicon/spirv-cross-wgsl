@@ -6,12 +6,16 @@
 # 1. Fast-forwards `main` to upstream `main`. `main` is a pure mirror, so this only fails if
 #    something was committed to it directly.
 # 2. Merges `main` into `wgsl`:
+#    - Upstream release tags (vulkan-sdk-*) are merged one at a time: if `main` contains a release tag
+#      which is not merged into `wgsl` yet, only the oldest such tag is merged, and the rest of `main`
+#      is merged by a later run. This way each upstream release has a matching `wgsl` commit, which the
+#      Release workflow builds and publishes.
 #    - If `wgsl` already contains `main`, there is nothing to do.
 #    - If the merge is clean, the result is pushed to the `upstream-sync` branch and a pull request
-#      into `wgsl` is opened (or updated). CI runs on the pull request; merge it once it passes.
+#      into `wgsl` is opened (or updated). CI runs on the pull request; merge it once it passes, using
+#      "Create a merge commit" (squash or rebase merges would drop the upstream history).
 #    - If the merge has conflicts, the run fails and an issue listing the conflicting files is
-#      opened (or updated). Resolve the merge locally:
-#        git fetch origin && git checkout wgsl && git merge origin/main
+#      opened (or updated) with the commands to resolve the merge locally.
 #
 # Requires a FORK_SYNC_TOKEN secret: a fine-grained personal access token for this repository with
 # read/write access to Contents, Pull requests, Issues and Workflows. The default GITHUB_TOKEN can't be
@@ -44,6 +48,7 @@ jobs:
       MIRROR_BRANCH: main
       WORK_BRANCH: wgsl
       SYNC_BRANCH: upstream-sync
+      UPSTREAM_URL: https://github.com/KhronosGroup/SPIRV-Cross.git
     steps:
       - name: Fast-forward main to upstream
         run: gh repo sync "$GITHUB_REPOSITORY" --branch "$MIRROR_BRANCH"
@@ -67,7 +72,24 @@ jobs:
             exit 0
           fi
 
-          if git merge --no-edit -m "Merge upstream into $WORK_BRANCH" "origin/$MIRROR_BRANCH"; then
+          # Merge the oldest upstream release tag which is in main but not in wgsl yet, if any.
+          # Tags are fetched into their own namespace, since the fork's tags may not match upstream's.
+          git fetch --no-tags "$UPSTREAM_URL" '+refs/tags/vulkan-sdk-*:refs/upstream-tags/vulkan-sdk-*'
+          target="origin/$MIRROR_BRANCH"
+          description="upstream \`$MIRROR_BRANCH\` (KhronosGroup/SPIRV-Cross $(git rev-parse --short "origin/$MIRROR_BRANCH"))"
+          for ref in $(git for-each-ref --format='%(refname)' 'refs/upstream-tags/vulkan-sdk-*' | sort -V); do
+            if git merge-base --is-ancestor "$ref" "origin/$MIRROR_BRANCH" && ! git merge-base --is-ancestor "$ref" HEAD; then
+              target="$ref"
+              description="upstream release \`${ref#refs/upstream-tags/}\` (KhronosGroup/SPIRV-Cross $(git rev-parse --short "$ref^{commit}"))"
+              break
+            fi
+          done
+          echo "Merging $target into $WORK_BRANCH."
+          echo "description=$description" >> "$GITHUB_OUTPUT"
+          # How to name the merge target in a local clone with the upstream tags fetched.
+          echo "local_target=${target#refs/upstream-tags/}" >> "$GITHUB_OUTPUT"
+
+          if git merge --no-edit -m "Merge ${description//\`/} into $WORK_BRANCH" "$target"; then
             echo "status=merged" >> "$GITHUB_OUTPUT"
           else
             git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt"
@@ -77,25 +99,28 @@ jobs:
 
       - name: Open pull request
         if: steps.merge.outputs.status == 'merged'
+        env:
+          DESCRIPTION: ${{ steps.merge.outputs.description }}
         run: |
           git push --force origin "HEAD:refs/heads/$SYNC_BRANCH"
-          upstream_sha=$(git rev-parse --short "origin/$MIRROR_BRANCH")
           existing=$(gh pr list --head "$SYNC_BRANCH" --base "$WORK_BRANCH" --state open --json number --jq '.[0].number')
           if [ -n "$existing" ]; then
-            gh pr comment "$existing" --body "Updated to upstream $upstream_sha."
+            gh pr comment "$existing" --body "Updated to $DESCRIPTION."
           else
             gh pr create --head "$SYNC_BRANCH" --base "$WORK_BRANCH" \
               --title "Merge upstream SPIRV-Cross into $WORK_BRANCH" \
-              --body "Merges upstream \`$MIRROR_BRANCH\` (KhronosGroup/SPIRV-Cross $upstream_sha) into \`$WORK_BRANCH\`. The merge had no conflicts. Merge this pull request once CI passes."
+              --body "Merges $DESCRIPTION into \`$WORK_BRANCH\`. The merge had no conflicts. Merge this pull request with \"Create a merge commit\" once CI passes."
           fi
 
       - name: Report merge conflicts
         if: steps.merge.outputs.status == 'conflict'
+        env:
+          DESCRIPTION: ${{ steps.merge.outputs.description }}
+          LOCAL_TARGET: ${{ steps.merge.outputs.local_target }}
         run: |
-          upstream_sha=$(git rev-parse --short "origin/$MIRROR_BRANCH")
-          body=$(printf 'Merging upstream `%s` (KhronosGroup/SPIRV-Cross %s) into `%s` has conflicts in:\n\n%s\n\nResolve the merge locally:\n\n```\ngit fetch origin\ngit checkout %s\ngit merge origin/%s\n```\n\nRun: %s' \
-            "$MIRROR_BRANCH" "$upstream_sha" "$WORK_BRANCH" "$(sed 's/^/- `/; s/$/`/' "$RUNNER_TEMP/conflicts.txt")" \
-            "$WORK_BRANCH" "$MIRROR_BRANCH" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
+          body=$(printf 'Merging %s into `%s` has conflicts in:\n\n%s\n\nResolve the merge locally:\n\n```\ngit fetch origin\ngit fetch --tags %s\ngit checkout %s\ngit merge %s\n```\n\nRun: %s' \
+            "$DESCRIPTION" "$WORK_BRANCH" "$(sed 's/^/- `/; s/$/`/' "$RUNNER_TEMP/conflicts.txt")" \
+            "$UPSTREAM_URL" "$WORK_BRANCH" "$LOCAL_TARGET" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
 
           if [ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .has_issues)" = "true" ]; then
             existing=$(gh issue list --label upstream-merge-conflict --state open --json number --jq '.[0].number')

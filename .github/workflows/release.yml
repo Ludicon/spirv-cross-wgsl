@@ -1,0 +1,219 @@
+# Copyright 2026 Ludicon LLC
+# SPDX-License-Identifier: Apache-2.0
+
+# Builds spirv-cross with the WGSL backend for macOS (universal binary) and Windows (x64), and publishes
+# them as a GitHub release.
+#
+# Automatic releases: upstream tags its releases (vulkan-sdk-*) on its main branch. The Sync with
+# upstream workflow merges each release tag into `wgsl` on its own. When WGSL CI passes on a push to
+# `wgsl`, this workflow finds the newest upstream release tag merged into that commit, and if there is no
+# release for it yet, it publishes `<upstream tag>-wgsl`, e.g. vulkan-sdk-1.4.363.0-wgsl.
+#
+# Manual runs (Actions > Release > Run workflow): build the selected branch. If a tag is given, a release
+# with that tag is published; otherwise the binaries are only attached to the workflow run as artifacts.
+
+name: Release
+
+on:
+  workflow_run:
+    workflows: [WGSL CI]
+    types: [completed]
+    branches: [wgsl]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish, e.g. vulkan-sdk-1.4.363.0-wgsl. Leave empty to only build the binaries.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_URL: https://github.com/KhronosGroup/SPIRV-Cross.git
+
+jobs:
+  prepare:
+    name: Prepare
+    if: >-
+      github.repository_owner == 'Ludicon' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      tag: ${{ steps.release.outputs.tag }}
+      label: ${{ steps.release.outputs.label }}
+      build: ${{ steps.release.outputs.build }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Determine release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+          git fetch --no-tags "$UPSTREAM_URL" '+refs/tags/vulkan-sdk-*:refs/upstream-tags/vulkan-sdk-*' '+refs/heads/main:refs/upstream-main'
+
+          # Newest upstream release merged into this commit.
+          upstream_tag=""
+          for ref in $(git for-each-ref --format='%(refname)' 'refs/upstream-tags/vulkan-sdk-*' | sort -V -r); do
+            if git merge-base --is-ancestor "$ref" HEAD; then
+              upstream_tag="${ref#refs/upstream-tags/}"
+              break
+            fi
+          done
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$INPUT_TAG"
+          elif [ -n "$upstream_tag" ] && ! gh release view "$upstream_tag-wgsl" > /dev/null 2>&1; then
+            tag="$upstream_tag-wgsl"
+          else
+            tag=""
+          fi
+
+          # Automatic runs without a new release have nothing to build.
+          if [ "$GITHUB_EVENT_NAME" = "workflow_run" ] && [ -z "$tag" ]; then
+            echo "No new upstream release in $sha."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "build=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          # Package names already say wgsl, so drop the release tag's -wgsl suffix from them.
+          label="${tag%-wgsl}"
+          label="${label:-$(git rev-parse --short HEAD)}"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+
+          # Release notes, describing which upstream version this is based on.
+          upstream_base=$(git merge-base HEAD refs/upstream-main)
+          if [ -n "$upstream_tag" ]; then
+            extra=$(git rev-list --count "refs/upstream-tags/$upstream_tag..$upstream_base")
+            if [ "$extra" = "0" ]; then
+              upstream="upstream release \`$upstream_tag\`"
+            else
+              upstream="upstream release \`$upstream_tag\` plus $extra later upstream commits (up to KhronosGroup/SPIRV-Cross@$(git rev-parse --short "$upstream_base"))"
+            fi
+          else
+            upstream="KhronosGroup/SPIRV-Cross@$(git rev-parse --short "$upstream_base")"
+          fi
+          cat > notes.md <<EOF
+          SPIRV-Cross with the WGSL backend (\`spirv-cross --wgsl\`), based on $upstream.
+
+          Built from \`$(git rev-parse --short HEAD)\`.
+
+          | File | Platform |
+          |---|---|
+          | \`spirv-cross-wgsl-$label-macos-universal.tar.gz\` | macOS 10.15 or later, Apple silicon and Intel |
+          | \`spirv-cross-wgsl-$label-windows-x64.zip\` | Windows, x64 |
+
+          The macOS binary is not signed or notarized. If macOS refuses to run it after downloading it with a
+          browser, remove the quarantine attribute: \`xattr -d com.apple.quarantine spirv-cross\`.
+          EOF
+          cat notes.md
+
+      - uses: actions/upload-artifact@v7
+        if: steps.release.outputs.build == 'true'
+        with:
+          name: release-notes
+          path: notes.md
+
+  build:
+    name: "Build ${{ matrix.name }}"
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    strategy:
+      matrix:
+        include:
+          - name: macos-universal
+            runner: macos-15
+            cmake_args: -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15
+            binary: build/spirv-cross
+          - name: windows-x64
+            runner: windows-latest
+            # Link the MSVC runtime statically, so the executable does not depend on the VC++ redistributable.
+            cmake_args: -A x64 -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+            binary: build/Release/spirv-cross.exe
+    runs-on: ${{ matrix.runner }}
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      PACKAGE: spirv-cross-wgsl-${{ needs.prepare.outputs.label }}-${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Configure
+        shell: bash
+        run: |
+          # spirv-cross --version reports `git describe --tags`, so tag the commit locally with the release name.
+          if [ -n "$TAG" ]; then
+            git tag -f "$TAG" HEAD
+          fi
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSPIRV_CROSS_ENABLE_TESTS=OFF ${{ matrix.cmake_args }}
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --config Release --target spirv-cross --parallel 4
+
+      - name: Test
+        shell: bash
+        run: |
+          "${{ matrix.binary }}" --version
+          "${{ matrix.binary }}" --wgsl tests-other/debug-lines.spv > /dev/null
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            lipo -archs "${{ matrix.binary }}" | grep -q x86_64
+            lipo -archs "${{ matrix.binary }}" | grep -q arm64
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p "dist/$PACKAGE"
+          cp "${{ matrix.binary }}" LICENSE README.md "dist/$PACKAGE/"
+          cd dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a "$PACKAGE.zip" "$PACKAGE" > /dev/null
+          else
+            tar -czf "$PACKAGE.tar.gz" "$PACKAGE"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.PACKAGE }}
+          path: dist/${{ env.PACKAGE }}.*
+
+  release:
+    name: Publish release
+    needs: [prepare, build]
+    if: needs.prepare.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      SHA: ${{ needs.prepare.outputs.sha }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish
+        run: |
+          ls -l artifacts
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber artifacts/spirv-cross-wgsl-*
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$SHA" --title "$TAG" \
+              --notes-file artifacts/notes.md artifacts/spirv-cross-wgsl-*
+          fi
