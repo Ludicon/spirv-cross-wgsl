@@ -8201,6 +8201,13 @@ void CompilerGLSL::emit_mix_op(uint32_t result_type, uint32_t id, uint32_t left,
 	}
 	else if (!has_boolean_mix && lerptype.basetype == SPIRType::Boolean)
 	{
+		// Ternary ? is short circuiting, so it introduces control flow.
+		// If an expression inside the ternary is control flow dependent, we break things.
+		// We could be smarter and restore which blocks are invalid after the ternary but that's too much jank.
+		// It's safer to just flush control dependent stuff to temporaries anyway.
+		assert(current_emitting_block);
+		flush_control_dependent_expressions(current_emitting_block->self);
+
 		// Boolean mix not supported on desktop without extension.
 		// Was added in OpenGL 4.5 with ES 3.1 compat.
 		//
@@ -17690,14 +17697,18 @@ string CompilerGLSL::type_to_glsl(const SPIRType &type, uint32_t id)
 
 	if (type.op == OpTypeCooperativeVectorNV)
 	{
+		std::string component_type_str = type_to_glsl(get<SPIRType>(type.ext.coopVecNV.component_type_id));
+
+		// This is an alias of OpTypeVectorIdEXT. Without the NV capability it's a long vector.
+		bool coopvec_nv = std::find(ir.declared_capabilities.begin(), ir.declared_capabilities.end(),
+		                            CapabilityCooperativeVectorNV) != ir.declared_capabilities.end();
+		if (long_vector_enabled && !coopvec_nv)
+			return join("vector<", component_type_str, ", ", to_expression(type.ext.coopVecNV.component_count_id), ">");
+
 		require_extension_internal("GL_NV_cooperative_vector");
 		if (!options.vulkan_semantics)
 			SPIRV_CROSS_THROW("Cooperative vector NV only available in Vulkan.");
 
-		std::string component_type_str = type_to_glsl(get<SPIRType>(type.ext.coopVecNV.component_type_id));
-
-		// There's two options. This is an alias of VectorTypeIdEXT.
-		// Just use NV_coopvec for now ...
 		return join("coopvecNV<", component_type_str, ", ", to_expression(type.ext.coopVecNV.component_count_id), ">");
 	}
 
@@ -20502,7 +20513,11 @@ void CompilerGLSL::emit_copy_logical_type(uint32_t lhs_id, uint32_t lhs_type_id,
 	auto &lhs_type = get<SPIRType>(lhs_type_id);
 	auto &rhs_type = get<SPIRType>(rhs_type_id);
 
-	if (!lhs_type.array.empty())
+	// Copy physical pointers as values. Following them could loop forever
+	// when a struct points back to itself.
+	bool is_pointer = is_physical_pointer(lhs_type);
+
+	if (!lhs_type.array.empty() && !is_pointer)
 	{
 		// Could use a loop here to support specialization constants, but it gets rather complicated with nested array types,
 		// and this is a rather obscure opcode anyways, keep it simple unless we are forced to.
@@ -20515,7 +20530,7 @@ void CompilerGLSL::emit_copy_logical_type(uint32_t lhs_id, uint32_t lhs_type_id,
 			emit_copy_logical_type(lhs_id, lhs_type.parent_type, rhs_id, rhs_type.parent_type, chain);
 		}
 	}
-	else if (lhs_type.basetype == SPIRType::Struct)
+	else if (lhs_type.basetype == SPIRType::Struct && !is_pointer)
 	{
 		chain.push_back(0);
 		uint32_t member_count = uint32_t(lhs_type.member_types.size());

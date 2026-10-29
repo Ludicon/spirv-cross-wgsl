@@ -703,7 +703,7 @@ void Parser::parse(const Instruction &instruction)
 		}
 		else if (width == 8)
 		{
-			if (length < 2)
+			if (length < 3)
 				SPIRV_CROSS_THROW("Missing encoding for OpTypeFloat 8.");
 			else if (ops[2] == FPEncodingFloat8E4M3EXT)
 				type.basetype = SPIRType::FloatE4M3;
@@ -1585,6 +1585,13 @@ void Parser::parse(const Instruction &instruction)
 
 bool Parser::types_are_logically_equivalent(const SPIRType &a, const SPIRType &b) const
 {
+	unordered_set<uint64_t> visited;
+	return types_are_logically_equivalent(a, b, visited);
+}
+
+bool Parser::types_are_logically_equivalent(const SPIRType &a, const SPIRType &b,
+                                            unordered_set<uint64_t> &visited) const
+{
 	if (a.basetype != b.basetype)
 		return false;
 	if (a.width != b.width)
@@ -1609,10 +1616,16 @@ bool Parser::types_are_logically_equivalent(const SPIRType &a, const SPIRType &b
 	if (a.member_types.size() != b.member_types.size())
 		return false;
 
+	// Buffer references let a struct point back to itself. If we're already
+	// comparing this pair, assume it matches and let the other members decide.
+	if (!visited.insert((uint64_t(a.self) << 32) | uint64_t(b.self)).second)
+		return true;
+
 	size_t member_types = a.member_types.size();
 	for (size_t i = 0; i < member_types; i++)
 	{
-		if (!types_are_logically_equivalent(get<SPIRType>(a.member_types[i]), get<SPIRType>(b.member_types[i])))
+		if (!types_are_logically_equivalent(get<SPIRType>(a.member_types[i]), get<SPIRType>(b.member_types[i]),
+		                                    visited))
 			return false;
 	}
 

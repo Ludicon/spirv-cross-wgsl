@@ -3259,6 +3259,8 @@ void CompilerMSL::add_composite_member_variable_to_interface_block(StorageClass 
 {
 	if (is_tessellation_shader() && has_member_decoration(var_type.self, mbr_idx, DecorationComponent))
 		SPIRV_CROSS_THROW("Component decoration is not supported in tessellation shaders.");
+	if (storage == StorageClassInput && has_member_decoration(var_type.self, mbr_idx, DecorationPerVertexKHR))
+		SPIRV_CROSS_THROW("PerVertexKHR decoration is not supported in MSL.");
 
 	auto &entry_func = get<SPIRFunction>(ir.default_entry_point);
 
@@ -3499,6 +3501,8 @@ void CompilerMSL::add_plain_member_variable_to_interface_block(StorageClass stor
                                                                const string &var_chain_qual,
                                                                uint32_t &location, uint32_t &var_mbr_idx)
 {
+	if (storage == StorageClassInput && has_member_decoration(var_type.self, mbr_idx, DecorationPerVertexKHR))
+		SPIRV_CROSS_THROW("PerVertexKHR decoration is not supported in MSL.");
 	auto &entry_func = get<SPIRFunction>(ir.default_entry_point);
 
 	BuiltIn builtin = BuiltInMax;
@@ -6096,6 +6100,28 @@ void CompilerMSL::emit_custom_templates()
 	}
 }
 
+// Begins a helper function implementing NoContraction (precise) arithmetic.
+// From MSL 3.2 the body is compiled with safe math and without contraction
+// through the scoped fp pragmas, so every operation stays exactly as written
+// while the helper can still be inlined. Earlier MSL versions have no such
+// pragmas; there the helper is optnone, which keeps it exact but turns every
+// use into a real function call.
+void CompilerMSL::emit_precise_helper_begin(const char *signature)
+{
+	if (msl_options.supports_msl_version(3, 2))
+	{
+		statement(signature);
+		begin_scope();
+		statement("#pragma metal fp math_mode(safe)");
+		statement("#pragma metal fp contract(off)");
+	}
+	else
+	{
+		statement("[[clang::optnone]] ", signature);
+		begin_scope();
+	}
+}
+
 // Emits any needed custom function bodies.
 // Metal helper functions must be static force-inline, i.e. static inline __attribute__((always_inline))
 // otherwise they will cause problems when linked together in a single Metallib.
@@ -6446,8 +6472,7 @@ void CompilerMSL::emit_custom_functions()
 		// "fadd" intrinsic support
 		case SPVFuncImplFAdd:
 			statement("template<typename T>");
-			statement("[[clang::optnone]] T spvFAdd(T l, T r)");
-			begin_scope();
+			emit_precise_helper_begin("T spvFAdd(T l, T r)");
 			statement("return fma(T(1), l, r);");
 			end_scope();
 			statement("");
@@ -6456,8 +6481,7 @@ void CompilerMSL::emit_custom_functions()
 		// "fsub" intrinsic support
 		case SPVFuncImplFSub:
 			statement("template<typename T>");
-			statement("[[clang::optnone]] T spvFSub(T l, T r)");
-			begin_scope();
+			emit_precise_helper_begin("T spvFSub(T l, T r)");
 			statement("return fma(T(-1), r, l);");
 			end_scope();
 			statement("");
@@ -6466,15 +6490,13 @@ void CompilerMSL::emit_custom_functions()
 		// "fmul' intrinsic support
 		case SPVFuncImplFMul:
 			statement("template<typename T>");
-			statement("[[clang::optnone]] T spvFMul(T l, T r)");
-			begin_scope();
+			emit_precise_helper_begin("T spvFMul(T l, T r)");
 			statement("return fma(l, r, T(-0.0));");
 			end_scope();
 			statement("");
 
 			statement("template<typename T, int Cols, int Rows>");
-			statement("[[clang::optnone]] vec<T, Cols> spvFMulVectorMatrix(vec<T, Rows> v, matrix<T, Cols, Rows> m)");
-			begin_scope();
+			emit_precise_helper_begin("vec<T, Cols> spvFMulVectorMatrix(vec<T, Rows> v, matrix<T, Cols, Rows> m)");
 			statement("vec<T, Cols> res = vec<T, Cols>(T(-0.0));");
 			statement("for (uint i = Rows; i > 0; --i)");
 			begin_scope();
@@ -6490,8 +6512,7 @@ void CompilerMSL::emit_custom_functions()
 			statement("");
 
 			statement("template<typename T, int Cols, int Rows>");
-			statement("[[clang::optnone]] vec<T, Rows> spvFMulMatrixVector(matrix<T, Cols, Rows> m, vec<T, Cols> v)");
-			begin_scope();
+			emit_precise_helper_begin("vec<T, Rows> spvFMulMatrixVector(matrix<T, Cols, Rows> m, vec<T, Cols> v)");
 			statement("vec<T, Rows> res = vec<T, Rows>(T(-0.0));");
 			statement("for (uint i = Cols; i > 0; --i)");
 			begin_scope();
@@ -6502,8 +6523,7 @@ void CompilerMSL::emit_custom_functions()
 			statement("");
 
 			statement("template<typename T, int LCols, int LRows, int RCols, int RRows>");
-			statement("[[clang::optnone]] matrix<T, RCols, LRows> spvFMulMatrixMatrix(matrix<T, LCols, LRows> l, matrix<T, RCols, RRows> r)");
-			begin_scope();
+			emit_precise_helper_begin("matrix<T, RCols, LRows> spvFMulMatrixMatrix(matrix<T, LCols, LRows> l, matrix<T, RCols, RRows> r)");
 			statement("static_assert(LCols == RRows, \"column-row configuration mismatch\");");
 			statement("matrix<T, RCols, LRows> res;");
 			statement("for (uint i = 0; i < RCols; i++)");
@@ -10454,6 +10474,7 @@ void CompilerMSL::emit_instruction(const Instruction &instruction)
 		uint32_t arg = ops[2];
 		string exp = join("spvQuantizeToF16(", to_expression(arg), ")");
 		emit_op(result_type, id, exp, should_forward(arg));
+		inherit_expression_dependencies(id, arg);
 		break;
 	}
 
@@ -17714,6 +17735,15 @@ bool CompilerMSL::variable_decl_is_remapped_storage(const SPIRVariable &variable
 		if (is_tese_shader() && is_builtin_variable(variable) && (builtin == BuiltInTessCoord || builtin == BuiltInPrimitiveId))
 			return false;
 
+		// A vertex shader's output block (not gl_PerVertex) is lowered to a thread-local copy which is
+		// written to the buffer on return from main (see get_type_address_space()). Treating it as a
+		// buffer here would cast component stores into it to device pointers, which doesn't compile.
+		if (get_execution_model() == ExecutionModelVertex && variable.storage == StorageClassOutput &&
+		    !is_builtin_variable(variable) && has_decoration(get<SPIRType>(variable.basetype).self, DecorationBlock))
+		{
+			return false;
+		}
+
 		// We won't be able to catch writes to control point outputs here since variable
 		// refers to a function local pointer.
 		// This is fine, as there cannot be concurrent writers to that memory anyways,
@@ -20423,6 +20453,17 @@ void CompilerMSL::emit_argument_buffer_aliased_descriptor(const SPIRVariable &al
 	}
 }
 
+void CompilerMSL::emit_argument_buffer_aliased_sampler(const SPIRVariable &aliased_var, const SPIRVariable &base_var)
+{
+	// A combined image sampler has no sampler variable of its own. Its sampler expression is derived from
+	// the texture name, and the aliased texture is a local variable, so the sampler must be one too.
+	auto &base_type = get_variable_data_type(base_var);
+	string base_sampler =
+	    base_type.basetype == SPIRType::SampledImage ? to_sampler_expression(base_var.self) : to_name(base_var.self);
+	string descriptor_storage = descriptor_address_space(aliased_var.self, aliased_var.storage, "");
+	statement(descriptor_storage, " auto &", to_sampler_expression(aliased_var.self), " = ", base_sampler, ";");
+}
+
 void CompilerMSL::analyze_argument_buffers()
 {
 	// Gather all used resources and sort them out into argument buffers.
@@ -20761,6 +20802,17 @@ void CompilerMSL::analyze_argument_buffers()
 				}
 				else
 					buffer_type.member_types.push_back(sampler_type_id);
+
+				if (resource.overlapping_var_id)
+				{
+					auto &entry_func = get<SPIRFunction>(ir.default_entry_point);
+					entry_func.fixup_hooks_in.push_back(
+					    [this, resource]()
+					    {
+						    emit_argument_buffer_aliased_sampler(*resource.var,
+							                                     this->get<SPIRVariable>(resource.overlapping_var_id));
+					    });
+				}
 			}
 			else
 			{
