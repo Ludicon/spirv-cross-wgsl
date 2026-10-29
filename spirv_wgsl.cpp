@@ -4054,6 +4054,24 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 
 	switch (opcode)
 	{
+	case OpSNegate:
+	{
+		// WGSL has no unary minus for unsigned integers, so negate by subtracting from zero, which wraps.
+		auto &input_type = expression_type(ops[2]);
+		if (input_type.basetype != SPIRType::UInt)
+		{
+			CompilerGLSL::emit_instruction(instruction);
+			break;
+		}
+		auto expr = join("(0u - ", to_enclosed_unpacked_expression(ops[2]), ")");
+		auto &out_type = get<SPIRType>(ops[0]);
+		if (out_type.basetype != input_type.basetype)
+			expr = bitcast_expression(out_type, input_type.basetype, expr);
+		emit_op(ops[0], ops[1], expr, should_forward(ops[2]));
+		inherit_expression_dependencies(ops[1], ops[2]);
+		break;
+	}
+
 	case OpLoad:
 	{
 		if (is_atomic_pointer(ops[2]))
