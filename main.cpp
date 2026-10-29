@@ -854,6 +854,8 @@ static void print_help_wgsl()
 	                "\t\t  ignored-bias: LOD bias outside of fragment shaders.\n"
 	                "\t\t  weak-compare-exchange: compare-exchange atomics emitted as atomicCompareExchangeWeak().\n"
 	                "\t\t  ignored-builtin: builtins without a WGSL equivalent, e.g. gl_PointSize.\n"
+	                "\t\t  atomic-min-max-emulation: atomic min / max emulated with a compare-exchange loop, when the same\n"
+	                "\t\t    memory is used with both signed and unsigned atomic min / max.\n"
 	                "\t\t  all: every warning.\n"
 	                "\t[--wgsl-disallow-non-uniform-derivatives]:\n\t\tDo not emit diagnostic(off, derivative_uniformity) for shaders which use implicit derivatives.\n"
 	);

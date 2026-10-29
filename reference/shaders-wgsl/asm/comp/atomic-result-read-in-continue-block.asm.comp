@@ -1,0 +1,35 @@
+struct SSBO
+{
+    values : array<atomic<i32>>,
+}
+
+@group(0) @binding(0) var<storage, read_write> _6 : SSBO;
+
+var<private> gl_GlobalInvocationID : vec3u;
+
+fn comp_main()
+{
+    var _27 : i32;
+    var _31 : i32;
+    loop
+    {
+        _27 = atomicLoad(&_6.values[gl_GlobalInvocationID.x]);
+        _31 = atomicCompareExchangeWeak(&_6.values[gl_GlobalInvocationID.x], _27, bitcast<i32>(bitcast<f32>(_27) + 1.5f)).old_value;
+        continuing
+        {
+            break if !(_31 != _27);
+        }
+    }
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

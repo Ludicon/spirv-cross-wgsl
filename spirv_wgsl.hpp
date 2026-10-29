@@ -65,6 +65,11 @@ enum WGSLWarning
 	// Builtin outputs which do not exist in WGSL (e.g. gl_PointSize) are written but ignored.
 	WGSL_WARNING_IGNORED_BUILTIN,
 
+	// Atomic min / max used with both signednesses on the same memory. WGSL's atomicMin() / atomicMax()
+	// take their signedness from the atomic's type, so the other signedness is emulated with a
+	// compare-exchange loop.
+	WGSL_WARNING_ATOMIC_MIN_MAX_EMULATION,
+
 	WGSL_WARNING_COUNT
 };
 
@@ -248,13 +253,15 @@ private:
 	bool resolve_atomic_target(uint32_t ptr_id, uint32_t &type_id, uint32_t &member, uint32_t &var_id);
 	bool member_is_atomic(uint32_t type_id, uint32_t index) const;
 	bool variable_is_atomic(uint32_t var_id) const;
+	SPIRType::BaseType atomic_basetype(uint32_t ptr_id);
+	SPIRType::BaseType atomic_target_basetype(uint64_t key, SPIRType::BaseType basetype) const;
 	void analyze_atomics();
 	void analyze_mutable_temporaries();
 	void analyze_single_store_variables();
 	void analyze_transient_16bit_integers();
 	bool is_16bit_integer_type(uint32_t type_id) const;
-	void mark_atomic_pointer(uint32_t ptr_id);
-	std::string wrap_atomic(const SPIRType &type, const std::string &base);
+	void mark_atomic_pointer(uint32_t ptr_id, Op opcode);
+	std::string wrap_atomic(const SPIRType &type, const std::string &base, uint64_t key);
 	std::string image_format_to_wgsl(ImageFormat fmt) const;
 	std::string image_access_to_wgsl(const SPIRType &type, uint32_t id);
 
@@ -278,6 +285,9 @@ private:
 	// Struct members and variables accessed with atomic operations.
 	std::unordered_set<uint64_t> atomic_members;
 	std::unordered_set<uint32_t> atomic_variables;
+	// Signedness of the atomic min / max operations on each struct member or variable, as a mask of
+	// ATOMIC_MIN_MAX_SIGNED and ATOMIC_MIN_MAX_UNSIGNED.
+	std::unordered_map<uint64_t, uint32_t> atomic_min_max_signedness;
 
 	// Temporaries which are modified after their declaration, and must be declared with var instead of let.
 	std::unordered_set<uint32_t> mutable_temporaries;

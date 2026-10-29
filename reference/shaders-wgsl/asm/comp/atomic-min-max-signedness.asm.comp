@@ -1,0 +1,35 @@
+struct SSBO
+{
+    values : atomic<i32>,
+    result : u32,
+}
+
+@group(0) @binding(0) var<storage, read_write> _buffer : SSBO;
+
+var<private> gl_GlobalInvocationID : vec3u;
+var<workgroup> shared_min : atomic<u32>;
+
+fn comp_main()
+{
+    let _24 = bitcast<u32>(atomicMin(&_buffer.values, bitcast<i32>(gl_GlobalInvocationID.x)));
+    let _25 = bitcast<u32>(atomicMax(&_buffer.values, bitcast<i32>(_24)));
+    let _26 = bitcast<u32>(atomicAdd(&_buffer.values, bitcast<i32>(7u)));
+    let _27 = bitcast<u32>(atomicCompareExchangeWeak(&_buffer.values, bitcast<i32>(_25), bitcast<i32>(_26)).old_value);
+    let _28 = bitcast<u32>(atomicLoad(&_buffer.values));
+    atomicStore(&_buffer.values, bitcast<i32>(_28));
+    let _30 = bitcast<i32>(atomicMax(&shared_min, bitcast<u32>(bitcast<i32>(gl_GlobalInvocationID.x))));
+    let _31 = bitcast<i32>(atomicExchange(&shared_min, bitcast<u32>(5)));
+    _buffer.result = _27 + bitcast<u32>(_31);
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}

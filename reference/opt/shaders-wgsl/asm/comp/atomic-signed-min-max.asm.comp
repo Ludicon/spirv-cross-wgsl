@@ -1,0 +1,70 @@
+struct SSBO
+{
+    values : array<atomic<u32>>,
+}
+
+struct SSBOI
+{
+    values : array<atomic<i32>>,
+}
+
+@group(0) @binding(0) var<storage, read_write> _9 : SSBO;
+@group(0) @binding(1) var<storage, read_write> _11 : SSBOI;
+
+var<private> gl_GlobalInvocationID : vec3u;
+var<workgroup> _shared : atomic<i32>;
+
+fn comp_main()
+{
+    let _22 = (0u - gl_GlobalInvocationID.x);
+    var _24 : u32;
+    _24 = atomicLoad(&_9.values[0u]);
+    loop
+    {
+        let _24_exchange = atomicCompareExchangeWeak(&_9.values[0u], _24, bitcast<u32>(min(bitcast<i32>(_24), bitcast<i32>(_22))));
+        if (_24_exchange.exchanged)
+        {
+            break;
+        }
+        _24 = _24_exchange.old_value;
+    }
+    var _26 : u32;
+    _26 = atomicLoad(&_9.values[1u]);
+    loop
+    {
+        let _26_exchange = atomicCompareExchangeWeak(&_9.values[1u], _26, bitcast<u32>(max(bitcast<i32>(_26), bitcast<i32>(_22))));
+        if (_26_exchange.exchanged)
+        {
+            break;
+        }
+        _26 = _26_exchange.old_value;
+    }
+    let _28 = atomicMin(&_9.values[2u], _22);
+    let _30 = atomicMax(&_9.values[3u], _22);
+    let _32 = bitcast<i32>(gl_GlobalInvocationID.x);
+    var _33 : i32;
+    _33 = atomicLoad(&_11.values[0u]);
+    loop
+    {
+        let _33_exchange = atomicCompareExchangeWeak(&_11.values[0u], _33, bitcast<i32>(min(bitcast<u32>(_33), bitcast<u32>(_32))));
+        if (_33_exchange.exchanged)
+        {
+            break;
+        }
+        _33 = _33_exchange.old_value;
+    }
+    let _34 = atomicMin(&_11.values[0u], _32);
+    let _35 = bitcast<u32>(atomicMin(&_shared, bitcast<i32>(_22)));
+}
+
+struct SPIRV_Cross_Input
+{
+    @builtin(global_invocation_id) gl_GlobalInvocationID : vec3u,
+}
+
+@compute @workgroup_size(1, 1, 1)
+fn main(stage_input : SPIRV_Cross_Input)
+{
+    gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
+    comp_main();
+}
