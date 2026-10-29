@@ -213,6 +213,7 @@ static const char *const warning_names[WGSL_WARNING_COUNT] = {
 	"ignored-bias",
 	"weak-compare-exchange",
 	"ignored-builtin",
+	"atomic-min-max-emulation",
 };
 
 const char *CompilerWGSL::get_warning_name(WGSLWarning kind)
@@ -1139,11 +1140,28 @@ string CompilerWGSL::image_type_glsl(const SPIRType &type, uint32_t id, bool)
 	return join("texture_", dim, "<", scalar_type_name(imagetype), ">");
 }
 
-string CompilerWGSL::wrap_atomic(const SPIRType &type, const string &base)
+// Keys for the struct members and variables accessed with atomic operations.
+static inline uint64_t atomic_member_key(uint32_t type_id, uint32_t index)
+{
+	return (uint64_t(type_id) << 32) | index;
+}
+
+static inline uint64_t atomic_variable_key(uint32_t var_id)
+{
+	return (uint64_t(~0u) << 32) | var_id;
+}
+
+enum
+{
+	ATOMIC_MIN_MAX_SIGNED = 1,
+	ATOMIC_MIN_MAX_UNSIGNED = 2
+};
+
+string CompilerWGSL::wrap_atomic(const SPIRType &type, const string &base, uint64_t key)
 {
 	if (!type.array.empty())
 	{
-		string elem = wrap_atomic(get<SPIRType>(type.parent_type), base);
+		string elem = wrap_atomic(get<SPIRType>(type.parent_type), base, key);
 		if (!type.array_size_literal.back())
 			return join("array<", elem, ", ", to_expression(type.array.back()), ">");
 		else if (type.array.back() == 0)
@@ -1156,7 +1174,9 @@ string CompilerWGSL::wrap_atomic(const SPIRType &type, const string &base)
 		return base;
 	if (type.vecsize != 1)
 		SPIRV_CROSS_THROW("Atomics are only supported on scalar types in WGSL.");
-	return join("atomic<", scalar_type_name(type), ">");
+	auto atomic_type = type;
+	atomic_type.basetype = atomic_target_basetype(key, type.basetype);
+	return join("atomic<", scalar_type_name(atomic_type), ">");
 }
 
 string CompilerWGSL::address_space(StorageClass storage) const
@@ -1213,8 +1233,9 @@ string CompilerWGSL::variable_decl(const SPIRVariable &variable)
 		break;
 	}
 
-	string type_name = variable_is_atomic(variable.self) ? wrap_atomic(type, type_to_glsl(type, variable.self)) :
-	                                                       type_to_glsl(type, variable.self);
+	string type_name = type_to_glsl(type, variable.self);
+	if (variable_is_atomic(variable.self))
+		type_name = wrap_atomic(type, type_name, atomic_variable_key(variable.self));
 	string initializer;
 	if (variable.loop_variable && variable.static_expression)
 	{
@@ -1567,11 +1588,6 @@ void CompilerWGSL::emit_sampled_image_op(uint32_t result_type, uint32_t result_i
 
 // Atomics analysis. WGSL requires atomic types for any memory accessed with atomic operations.
 
-static inline uint64_t atomic_member_key(uint32_t type_id, uint32_t index)
-{
-	return (uint64_t(type_id) << 32) | index;
-}
-
 void CompilerWGSL::analyze_mutable_temporaries()
 {
 	// SPIR-V values are immutable, so temporaries can be declared with let, except when the GLSL backend
@@ -1844,7 +1860,7 @@ void CompilerWGSL::analyze_atomics()
 				switch (static_cast<Op>(i.op))
 				{
 				case OpAtomicStore:
-					mark_atomic_pointer(ops[0]);
+					mark_atomic_pointer(ops[0], OpAtomicStore);
 					break;
 
 				case OpAtomicLoad:
@@ -1862,7 +1878,7 @@ void CompilerWGSL::analyze_atomics()
 				case OpAtomicAnd:
 				case OpAtomicOr:
 				case OpAtomicXor:
-					mark_atomic_pointer(ops[2]);
+					mark_atomic_pointer(ops[2], static_cast<Op>(i.op));
 					break;
 
 				default:
@@ -1949,16 +1965,53 @@ bool CompilerWGSL::resolve_atomic_target(uint32_t ptr_id, uint32_t &type_id, uin
 	return true;
 }
 
-void CompilerWGSL::mark_atomic_pointer(uint32_t ptr_id)
+void CompilerWGSL::mark_atomic_pointer(uint32_t ptr_id, Op opcode)
 {
 	uint32_t type_id, member, var_id;
 	if (!resolve_atomic_target(ptr_id, type_id, member, var_id))
 		return;
 
+	uint64_t key;
 	if (var_id)
+	{
 		atomic_variables.insert(var_id);
+		key = atomic_variable_key(var_id);
+	}
 	else
-		atomic_members.insert(atomic_member_key(type_id, member));
+	{
+		key = atomic_member_key(type_id, member);
+		atomic_members.insert(key);
+	}
+
+	if (opcode == OpAtomicSMin || opcode == OpAtomicSMax)
+		atomic_min_max_signedness[key] |= ATOMIC_MIN_MAX_SIGNED;
+	else if (opcode == OpAtomicUMin || opcode == OpAtomicUMax)
+		atomic_min_max_signedness[key] |= ATOMIC_MIN_MAX_UNSIGNED;
+}
+
+// WGSL's atomicMin() / atomicMax() take their signedness from the atomic's type, so an atomic is declared
+// with the signedness of the min / max operations on it. The other operations work on the bits, and
+// are the same for either signedness.
+SPIRType::BaseType CompilerWGSL::atomic_target_basetype(uint64_t key, SPIRType::BaseType basetype) const
+{
+	auto itr = atomic_min_max_signedness.find(key);
+	if (itr == end(atomic_min_max_signedness))
+		return basetype;
+	if (itr->second == ATOMIC_MIN_MAX_SIGNED)
+		return SPIRType::Int;
+	if (itr->second == ATOMIC_MIN_MAX_UNSIGNED)
+		return SPIRType::UInt;
+	return basetype;
+}
+
+SPIRType::BaseType CompilerWGSL::atomic_basetype(uint32_t ptr_id)
+{
+	auto basetype = get_pointee_type(expression_type(ptr_id)).basetype;
+	uint32_t type_id, member, var_id;
+	if (!resolve_atomic_target(ptr_id, type_id, member, var_id))
+		return basetype;
+	return atomic_target_basetype(var_id ? atomic_variable_key(var_id) : atomic_member_key(type_id, member),
+	                              basetype);
 }
 
 bool CompilerWGSL::is_atomic_pointer(uint32_t ptr_id)
@@ -2442,7 +2495,7 @@ void CompilerWGSL::emit_struct_wgsl(SPIRType &type)
 			                                                    is_matrix_or_matrix_array(*this, type.member_types[i]));
 
 		if (member_is_atomic(type.self, i))
-			type_name = wrap_atomic(membertype, type_name);
+			type_name = wrap_atomic(membertype, type_name, atomic_member_key(type.self, i));
 
 		statement(attrs, to_member_name(type, i), " : ", type_name, ",");
 	}
@@ -3493,11 +3546,12 @@ void CompilerWGSL::emit_atomic_op(const Instruction &instruction)
 	{
 		uint32_t ptr = ops[0];
 		uint32_t value = ops[3];
-		auto &ptr_type = expression_type(ptr);
+		auto atomic_type = get_pointee_type(expression_type(ptr));
+		atomic_type.basetype = atomic_basetype(ptr);
 		auto &value_type = expression_type(value);
 		string value_expr = to_unpacked_expression(value);
-		if (value_type.basetype != ptr_type.basetype)
-			value_expr = bitcast_expression(get_pointee_type(ptr_type), value_type.basetype, value_expr);
+		if (value_type.basetype != atomic_type.basetype)
+			value_expr = bitcast_expression(atomic_type, value_type.basetype, value_expr);
 		statement("atomicStore(&", to_expression(ptr), ", ", value_expr, ");");
 		flush_all_atomic_capable_variables();
 		register_write(ptr);
@@ -3507,9 +3561,10 @@ void CompilerWGSL::emit_atomic_op(const Instruction &instruction)
 	uint32_t result_type = ops[0];
 	uint32_t id = ops[1];
 	uint32_t ptr = ops[2];
-	auto &ptr_type = get_pointee_type(expression_type(ptr));
+	auto ptr_type = get_pointee_type(expression_type(ptr));
 	if (ptr_type.basetype != SPIRType::Int && ptr_type.basetype != SPIRType::UInt)
 		SPIRV_CROSS_THROW("WGSL only supports atomics on 32-bit integers.");
+	ptr_type.basetype = atomic_basetype(ptr);
 	string ptr_expr = join("&", to_expression(ptr));
 
 	auto value_expr = [&](uint32_t value) -> string
@@ -3520,6 +3575,43 @@ void CompilerWGSL::emit_atomic_op(const Instruction &instruction)
 			expr = bitcast_expression(ptr_type, value_type.basetype, expr);
 		return expr;
 	};
+
+	// The signedness of WGSL's atomicMin() / atomicMax() comes from the atomic's type, which is declared
+	// with the signedness of the min / max operations on it. If both are used on the same atomic, emulate
+	// the other one with a compare-exchange loop.
+	bool is_signed_min_max = opcode == OpAtomicSMin || opcode == OpAtomicSMax;
+	bool is_min_max = is_signed_min_max || opcode == OpAtomicUMin || opcode == OpAtomicUMax;
+	if (is_min_max && is_signed_min_max != (ptr_type.basetype == SPIRType::Int))
+	{
+		warn(WGSL_WARNING_ATOMIC_MIN_MAX_EMULATION,
+		     join(is_signed_min_max ? "Signed" : "Unsigned", " atomic min / max ", warning_location(),
+		          " is emulated with a compare-exchange loop, since the same memory is also used with ",
+		          is_signed_min_max ? "unsigned" : "signed", " atomic min / max."));
+
+		auto op_type = ptr_type;
+		op_type.basetype = is_signed_min_max ? SPIRType::Int : SPIRType::UInt;
+		bool is_min = opcode == OpAtomicSMin || opcode == OpAtomicUMin;
+
+		emit_uninitialized_temporary_expression(result_type, id);
+		auto old_value = to_expression(id);
+		auto exchange = join(old_value, "_exchange");
+		auto new_value = join(is_min ? "min(" : "max(", bitcast_expression(op_type, ptr_type.basetype, old_value),
+		                      ", ", bitcast_expression(op_type, ptr_type.basetype, value_expr(ops[5])), ")");
+		statement(old_value, " = atomicLoad(", ptr_expr, ");");
+		statement("loop");
+		begin_scope();
+		statement("let ", exchange, " = atomicCompareExchangeWeak(", ptr_expr, ", ", old_value, ", ",
+		          bitcast_expression(ptr_type, op_type.basetype, new_value), ");");
+		statement("if (", exchange, ".exchanged)");
+		begin_scope();
+		statement("break;");
+		end_scope();
+		statement(old_value, " = ", exchange, ".old_value;");
+		end_scope();
+		flush_all_atomic_capable_variables();
+		register_write(ptr);
+		return;
+	}
 
 	string expr;
 	switch (opcode)
@@ -3962,6 +4054,24 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 
 	switch (opcode)
 	{
+	case OpSNegate:
+	{
+		// WGSL has no unary minus for unsigned integers, so negate by subtracting from zero, which wraps.
+		auto &input_type = expression_type(ops[2]);
+		if (input_type.basetype != SPIRType::UInt)
+		{
+			CompilerGLSL::emit_instruction(instruction);
+			break;
+		}
+		auto expr = join("(0u - ", to_enclosed_unpacked_expression(ops[2]), ")");
+		auto &out_type = get<SPIRType>(ops[0]);
+		if (out_type.basetype != input_type.basetype)
+			expr = bitcast_expression(out_type, input_type.basetype, expr);
+		emit_op(ops[0], ops[1], expr, should_forward(ops[2]));
+		inherit_expression_dependencies(ops[1], ops[2]);
+		break;
+	}
+
 	case OpLoad:
 	{
 		if (is_atomic_pointer(ops[2]))
@@ -3969,7 +4079,12 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 			uint32_t result_type = ops[0];
 			uint32_t id = ops[1];
 			forced_temporaries.insert(id);
-			emit_op(result_type, id, join("atomicLoad(&", to_expression(ops[2]), ")"), false);
+			auto expr = join("atomicLoad(&", to_expression(ops[2]), ")");
+			auto basetype = atomic_basetype(ops[2]);
+			auto &out_type = get<SPIRType>(result_type);
+			if (out_type.basetype != basetype)
+				expr = bitcast_expression(out_type, basetype, expr);
+			emit_op(result_type, id, expr, false);
 			break;
 		}
 		CompilerGLSL::emit_instruction(instruction);
@@ -3980,7 +4095,13 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 	{
 		if (is_atomic_pointer(ops[0]))
 		{
-			statement("atomicStore(&", to_expression(ops[0]), ", ", to_unpacked_expression(ops[1]), ");");
+			auto atomic_type = expression_type(ops[1]);
+			auto value_basetype = atomic_type.basetype;
+			atomic_type.basetype = atomic_basetype(ops[0]);
+			auto value_expr = to_unpacked_expression(ops[1]);
+			if (value_basetype != atomic_type.basetype)
+				value_expr = bitcast_expression(atomic_type, value_basetype, value_expr);
+			statement("atomicStore(&", to_expression(ops[0]), ", ", value_expr, ");");
 			register_write(ops[0]);
 			break;
 		}
