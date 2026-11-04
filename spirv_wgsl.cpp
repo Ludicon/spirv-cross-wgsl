@@ -3592,6 +3592,9 @@ void CompilerWGSL::emit_atomic_op(const Instruction &instruction)
 		op_type.basetype = is_signed_min_max ? SPIRType::Int : SPIRType::UInt;
 		bool is_min = opcode == OpAtomicSMin || opcode == OpAtomicUMin;
 
+		// The loop makes the expressions in it conditional, so flush control dependent expressions first.
+		assert(current_emitting_block);
+		flush_control_dependent_expressions(current_emitting_block->self);
 		emit_uninitialized_temporary_expression(result_type, id);
 		auto old_value = to_expression(id);
 		auto exchange = join(old_value, "_exchange");
@@ -3897,7 +3900,11 @@ void CompilerWGSL::emit_select_op(uint32_t result_type, uint32_t id, uint32_t co
 
 	if (type.columns > 1 || !type.array.empty() || type.basetype == SPIRType::Struct)
 	{
-		// select() only works on scalars and vectors.
+		// select() only works on scalars and vectors. Unlike select(), an if statement makes the
+		// expressions in it conditional, so flush any control dependent expressions (e.g. implicit
+		// derivatives) to temporaries before it.
+		assert(current_emitting_block);
+		flush_control_dependent_expressions(current_emitting_block->self);
 		emit_uninitialized_temporary_expression(result_type, id);
 		statement("if (", to_expression(cond), ")");
 		begin_scope();
