@@ -139,6 +139,7 @@ string CompilerWGSL::compile()
 	analyze_mutable_temporaries();
 	analyze_single_store_variables();
 	analyze_transient_16bit_integers();
+	analyze_bda_structs();
 	prepare_buffer_layouts();
 
 	uint32_t pass_count = 0;
@@ -214,6 +215,7 @@ static const char *const warning_names[WGSL_WARNING_COUNT] = {
 	"weak-compare-exchange",
 	"ignored-builtin",
 	"atomic-min-max-emulation",
+	"zero-base-vertex-instance",
 };
 
 const char *CompilerWGSL::get_warning_name(WGSLWarning kind)
@@ -306,6 +308,16 @@ void CompilerWGSL::emit_header()
 		statement("enable subgroups;");
 		emitted = true;
 	}
+	if (requires_resource_table)
+	{
+		statement("enable chromium_experimental_resource_table;");
+		emitted = true;
+	}
+	if (requires_immediates)
+	{
+		statement("requires immediate_address_space;");
+		emitted = true;
+	}
 	if (uses_implicit_derivatives && wgsl_options.allow_non_uniform_derivatives)
 	{
 		statement("diagnostic(off, derivative_uniformity);");
@@ -319,6 +331,9 @@ void CompilerWGSL::emit_header()
 
 void CompilerWGSL::emit_helper_functions()
 {
+	if (requires_bda_arenas)
+		emit_bda_functions();
+
 	if (requires_non_finite_helper)
 	{
 		// WGSL rejects infinity and NaN in constant expressions, but function calls are evaluated at runtime.
@@ -865,7 +880,11 @@ string CompilerWGSL::base_type_name(const SPIRType &type)
 string CompilerWGSL::type_to_glsl(const SPIRType &type, uint32_t id)
 {
 	if (is_physical_pointer(type))
-		SPIRV_CROSS_THROW("Buffer device addresses are not supported in WGSL.");
+	{
+		if (!wgsl_options.bda_arena_count)
+			SPIRV_CROSS_THROW("Buffer device addresses are not supported in WGSL without arenas (bda_arena_count).");
+		return "vec2u";
+	}
 
 	if (type.pointer && type.parent_type)
 		return type_to_glsl(get<SPIRType>(type.parent_type), id);
@@ -1192,8 +1211,11 @@ string CompilerWGSL::address_space(StorageClass storage) const
 	case StorageClassWorkgroup:
 		return "workgroup";
 	case StorageClassUniform:
-	case StorageClassPushConstant:
 		return "uniform";
+	case StorageClassPushConstant:
+		return wgsl_options.push_constants_as_immediates ? "immediate" :
+		       wgsl_options.push_constants_as_storage    ? "storage" :
+		                                                   "uniform";
 	case StorageClassStorageBuffer:
 		return "storage";
 	default:
@@ -1205,6 +1227,8 @@ string CompilerWGSL::ptr_type(const SPIRType &pointee, StorageClass storage, uin
 {
 	string space = address_space(storage);
 	string base = type_to_glsl(pointee, id);
+	if (space == "storage" && storage == StorageClassPushConstant)
+		return join("ptr<storage, ", base, ", read>");
 	if (space == "storage")
 		return join("ptr<storage, ", base, ", read_write>");
 	return join("ptr<", space, ", ", base, ">");
@@ -2083,6 +2107,14 @@ void CompilerWGSL::wgsl_layout(uint32_t type_id, bool transpose, uint32_t &align
 {
 	auto &t = get<SPIRType>(type_id);
 
+	if (is_physical_pointer(t))
+	{
+		// Buffer device addresses are vec2u.
+		align = 8;
+		size = 8;
+		return;
+	}
+
 	if (!t.array.empty())
 	{
 		uint32_t ealign, esize;
@@ -2193,6 +2225,8 @@ void CompilerWGSL::prepare_buffer_layouts()
 
 	for (auto struct_id : struct_types)
 	{
+		if (bda_only_structs.count(struct_id))
+			continue;
 		for (uint32_t i = 0; i < uint32_t(get<SPIRType>(struct_id).member_types.size()); i++)
 		{
 			if (has_extended_member_decoration(struct_id, i, SPIRVCrossDecorationPhysicalTypeID))
@@ -2431,7 +2465,8 @@ void CompilerWGSL::emit_struct_wgsl(SPIRType &type)
 	type.member_name_cache.clear();
 
 	uint32_t member_count = uint32_t(type.member_types.size());
-	bool has_offsets = member_count > 0 && has_member_decoration(type.self, 0, DecorationOffset);
+	bool has_offsets = member_count > 0 && has_member_decoration(type.self, 0, DecorationOffset) &&
+	                   !bda_only_structs.count(type.self);
 
 	// Compute @size attributes required to match the SPIR-V member offsets.
 	SmallVector<uint32_t> size_attrs(member_count);
@@ -2513,6 +2548,9 @@ void CompilerWGSL::emit_constants_and_structs()
 	ID workgroup_size_id = get_work_group_size_specialization_constants(wg_x, wg_y, wg_z);
 
 	bool emitted = false;
+	// SPIR-V allows several constants with one SpecId (glslang emits two for LocalSizeId), but WGSL does not allow
+	// duplicate @id attributes.
+	unordered_map<uint32_t, uint32_t> spec_id_to_constant;
 	auto loop_lock = ir.create_loop_hard_lock();
 	for (auto &id_ : ir.ids_for_constant_undef_or_type)
 	{
@@ -2541,8 +2579,25 @@ void CompilerWGSL::emit_constants_and_structs()
 				if (type.vecsize == 1 && type.columns == 1 && type.array.empty() && type.basetype != SPIRType::Struct)
 				{
 					if (has_decoration(c.self, DecorationSpecId))
-						statement("@id(", get_decoration(c.self, DecorationSpecId), ") override ", name, " : ",
-						          type_to_glsl(type), " = ", constant_expression(c), ";");
+					{
+						uint32_t spec_id = get_decoration(c.self, DecorationSpecId);
+						auto first = spec_id_to_constant.find(spec_id);
+						if (first == spec_id_to_constant.end())
+						{
+							spec_id_to_constant[spec_id] = c.self;
+							statement("@id(", spec_id, ") override ", name, " : ", type_to_glsl(type), " = ",
+							          constant_expression(c), ";");
+						}
+						else
+						{
+							// Follows the constant declared with this @id, which pipelines set.
+							auto &first_type = get<SPIRType>(get<SPIRConstant>(first->second).constant_type);
+							string value = to_name(first->second);
+							if (first_type.basetype != type.basetype)
+								value = join(type_to_glsl(type), "(", value, ")");
+							statement("override ", name, " : ", type_to_glsl(type), " = ", value, ";");
+						}
+					}
 					else
 						statement("override ", name, " : ", type_to_glsl(type), " = ", constant_expression(c), ";");
 				}
@@ -2757,6 +2812,37 @@ void CompilerWGSL::emit_push_constant_block(const SPIRVariable &var)
 	auto &type = get<SPIRType>(var.basetype);
 	add_resource_name(var.self);
 
+	if (wgsl_options.push_constants_as_immediates)
+	{
+		// Arrays are not allowed in immediate data, also not inside structs.
+		function<void(uint32_t)> check = [&](uint32_t type_id)
+		{
+			auto &t = ir.ids[type_id].get<SPIRType>();
+			if (is_physical_pointer(t))
+				return;
+			if (!t.array.empty())
+				SPIRV_CROSS_THROW(join("Push constant block ", to_name(var.self),
+				                       " contains an array, which is not allowed in WGSL immediate data."));
+			if (t.pointer)
+				check(t.parent_type);
+			else if (t.basetype == SPIRType::Struct)
+				for (auto member : t.member_types)
+					check(member);
+		};
+		check(var.basetype);
+
+		uint32_t align = 0, size = 0;
+		wgsl_layout(get_variable_data_type_id(var), false, align, size);
+		if (size > wgsl_options.immediate_size_limit)
+			SPIRV_CROSS_THROW(join("Push constant block ", to_name(var.self), " is ", size,
+			                       " bytes, which exceeds the immediate data limit of ",
+			                       wgsl_options.immediate_size_limit, " bytes."));
+
+		require_enable(requires_immediates);
+		statement("var<immediate> ", to_name(var.self), " : ", type_to_glsl(type, var.self), ";");
+		return;
+	}
+
 	uint32_t group = wgsl_options.push_constant_group;
 	uint32_t binding = wgsl_options.push_constant_binding;
 	if (has_decoration(var.self, DecorationDescriptorSet))
@@ -2764,13 +2850,461 @@ void CompilerWGSL::emit_push_constant_block(const SPIRVariable &var)
 	if (has_decoration(var.self, DecorationBinding))
 		binding = get_decoration(var.self, DecorationBinding);
 
-	statement("@group(", group, ") @binding(", binding, ") var<uniform> ", to_name(var.self), " : ",
+	statement("@group(", group, ") @binding(", binding, ") var<",
+	          wgsl_options.push_constants_as_storage ? "storage, read" : "uniform", "> ", to_name(var.self), " : ",
 	          type_to_glsl(type, var.self), ";");
+}
+
+bool CompilerWGSL::is_resource_table_variable(uint32_t id) const
+{
+	auto *var = maybe_get<SPIRVariable>(id);
+	if (!wgsl_options.use_resource_table || !var || var->storage != StorageClassUniformConstant)
+		return false;
+	return !get_variable_data_type(*var).array.empty() &&
+	       get_decoration(id, DecorationDescriptorSet) == wgsl_options.resource_table_group;
+}
+
+string CompilerWGSL::resource_table_access(uint32_t var_id, uint32_t index_id)
+{
+	SPIRType element = get_variable_data_type(get<SPIRVariable>(var_id));
+	element.array.clear();
+	element.array_size_literal.clear();
+	if (element.basetype == SPIRType::SampledImage)
+		SPIRV_CROSS_THROW(join("Combined image sampler array ", to_name(var_id),
+		                       " cannot be placed in a resource table, WGSL has no combined image samplers."));
+
+	auto &offsets = wgsl_options.resource_table_binding_offsets;
+	auto itr = offsets.find(get_decoration(var_id, DecorationBinding));
+	uint32_t offset = itr != offsets.end() ? itr->second : 0;
+
+	// getResource() takes an i32 or u32 index, but adding the offset requires u32.
+	string index = to_unpacked_expression(index_id);
+	if (offset)
+	{
+		bool is_unsigned = expression_type(index_id).basetype == SPIRType::UInt;
+		string unsigned_index = is_unsigned ? to_enclosed_unpacked_expression(index_id) : join("u32(", index, ")");
+		index = join(offset, "u + ", unsigned_index);
+	}
+	return join("getResource<", type_to_glsl(element, var_id), ">(", index, ")");
+}
+
+bool CompilerWGSL::is_bda_pointer(uint32_t id)
+{
+	if (!is_physical_pointer(expression_type(id)))
+		return false;
+	if (!wgsl_options.bda_arena_count)
+		SPIRV_CROSS_THROW("Buffer device addresses are not supported in WGSL without arenas (bda_arena_count).");
+	require_enable(requires_bda_arenas);
+	return true;
+}
+
+static bool is_bda_scalar(const SPIRType &type)
+{
+	return !(type.op == OpTypePointer && type.storage == StorageClassPhysicalStorageBuffer) && type.array.empty() &&
+	       type.basetype != SPIRType::Struct && type.vecsize == 1 && type.columns == 1;
+}
+
+// Pointer arithmetic on a vec2u of (byte offset, arena). Offsets never carry into the arena.
+static string bda_offset(const string &ptr, uint32_t offset)
+{
+	return offset ? join(ptr, " + vec2u(", offset, "u, 0u)") : ptr;
+}
+
+string CompilerWGSL::bda_tag(uint32_t type_id, const BdaLayout &layout)
+{
+	auto &type = get<SPIRType>(type_id);
+	if (is_physical_pointer(type))
+		return "ptr";
+	if (!type.array.empty())
+	{
+		if (!type.array_size_literal.back() || type.array.back() == 0)
+			SPIRV_CROSS_THROW("Runtime and specialization constant sized arrays cannot be loaded or stored as a whole "
+			                  "through buffer device addresses in WGSL.");
+		return join(bda_tag(type.parent_type, layout), "_x", type.array.back(), "s",
+		            get_decoration(type_id, DecorationArrayStride));
+	}
+	if (type.basetype == SPIRType::Struct)
+		return to_name(type.self);
+	string tag = type_to_glsl(type);
+	tag.erase(remove_if(tag.begin(), tag.end(), [](char c) { return c == '<' || c == '>' || c == ',' || c == ' '; }),
+	          tag.end());
+	if (type.columns > 1)
+		tag += join("s", layout.matrix_stride, layout.row_major ? "r" : "");
+	return tag;
+}
+
+string CompilerWGSL::register_bda_accessor(map<string, BdaAccessor> &accessors, uint32_t type_id,
+                                           const BdaLayout &layout)
+{
+	string tag = bda_tag(type_id, layout);
+	if (accessors.count(tag))
+		return tag;
+	accessors[tag] = { type_id, layout };
+	force_recompile();
+
+	// Register nested accessors as well, so that all of them are emitted in the next pass.
+	auto &type = get<SPIRType>(type_id);
+	if (is_physical_pointer(type))
+		return tag;
+	if (!type.array.empty())
+	{
+		if (!is_bda_scalar(get<SPIRType>(type.parent_type)))
+			register_bda_accessor(accessors, type.parent_type, layout);
+	}
+	else if (type.basetype == SPIRType::Struct)
+	{
+		for (uint32_t i = 0; i < uint32_t(type.member_types.size()); i++)
+		{
+			if (is_bda_scalar(get<SPIRType>(type.member_types[i])))
+				continue;
+			BdaLayout member_layout = { get_member_decoration(type.self, i, DecorationMatrixStride),
+				                        has_member_decoration(type.self, i, DecorationRowMajor) };
+			register_bda_accessor(accessors, type.member_types[i], member_layout);
+		}
+	}
+	return tag;
+}
+
+string CompilerWGSL::bda_scalar_load(const SPIRType &type, const string &ptr)
+{
+	string word = join("spvBdaLoad(", ptr, ")");
+	if (type.basetype == SPIRType::Boolean)
+		return join("(", word, " != 0u)");
+	if (type.width != 32)
+		SPIRV_CROSS_THROW(join("Only 32-bit types can be accessed through buffer device addresses in WGSL, not ",
+		                       base_type_name(type), "."));
+	switch (type.basetype)
+	{
+	case SPIRType::UInt:
+		return word;
+	case SPIRType::Int:
+		return join("bitcast<i32>(", word, ")");
+	case SPIRType::Float:
+		return join("bitcast<f32>(", word, ")");
+	default:
+		SPIRV_CROSS_THROW(join("Type ", base_type_name(type), " cannot be accessed through buffer device addresses."));
+	}
+}
+
+string CompilerWGSL::bda_scalar_store(const SPIRType &type, const string &ptr, const string &value)
+{
+	string word;
+	if (type.basetype == SPIRType::Boolean)
+		word = join("select(0u, 1u, ", value, ")");
+	else if (type.width != 32)
+		SPIRV_CROSS_THROW(join("Only 32-bit types can be accessed through buffer device addresses in WGSL, not ",
+		                       base_type_name(type), "."));
+	else if (type.basetype == SPIRType::UInt)
+		word = value;
+	else if (type.basetype == SPIRType::Int || type.basetype == SPIRType::Float)
+		word = join("bitcast<u32>(", value, ")");
+	else
+		SPIRV_CROSS_THROW(join("Type ", base_type_name(type), " cannot be accessed through buffer device addresses."));
+	return join("spvBdaStore(", ptr, ", ", word, ")");
+}
+
+string CompilerWGSL::bda_load(uint32_t type_id, const BdaLayout &layout, const string &ptr)
+{
+	auto &type = get<SPIRType>(type_id);
+	if (is_bda_scalar(type))
+		return bda_scalar_load(type, ptr);
+	return join("spvBdaLoad_", register_bda_accessor(bda_loads, type_id, layout), "(", ptr, ")");
+}
+
+string CompilerWGSL::bda_store(uint32_t type_id, const BdaLayout &layout, const string &ptr, const string &value)
+{
+	if (!wgsl_options.bda_arenas_writable)
+		SPIRV_CROSS_THROW("Stores through buffer device addresses require writable arenas (bda_arenas_writable).");
+	require_enable(requires_bda_stores);
+	auto &type = get<SPIRType>(type_id);
+	if (is_bda_scalar(type))
+		return bda_scalar_store(type, ptr, value);
+	return join("spvBdaStore_", register_bda_accessor(bda_stores, type_id, layout), "(", ptr, ", ", value, ")");
+}
+
+void CompilerWGSL::emit_bda_access_chain(uint32_t result_type, uint32_t id, uint32_t base, const uint32_t *indices,
+                                         uint32_t count, bool ptr_chain)
+{
+	auto itr = bda_pointer_layouts.find(base);
+	BdaLayout layout = itr != bda_pointer_layouts.end() ? itr->second : BdaLayout{};
+
+	// The byte offset is the sum of a constant and dynamic index * stride terms, in u32 arithmetic.
+	uint32_t const_offset = 0;
+	string dynamic_offset;
+	bool forward = should_forward(base);
+	SmallVector<uint32_t> dynamic_indices;
+	auto add_index = [&](uint32_t index_id, uint32_t stride)
+	{
+		bool is_constant = ir.ids[index_id].get_type() == TypeConstant;
+		bool is_zero = is_constant && !ir.ids[index_id].get<SPIRConstant>().specialization &&
+		               !ir.ids[index_id].get<SPIRConstant>().scalar();
+		if (!stride && !is_zero)
+			SPIRV_CROSS_THROW("Buffer device address access chain has no stride decoration.");
+		if (is_constant && !ir.ids[index_id].get<SPIRConstant>().specialization)
+		{
+			const_offset += ir.ids[index_id].get<SPIRConstant>().scalar() * stride;
+			return;
+		}
+		auto &index_type = expression_type(index_id);
+		if (index_type.width != 32)
+			SPIRV_CROSS_THROW("Only 32-bit indices are supported in buffer device address access chains in WGSL.");
+		string index = index_type.basetype == SPIRType::UInt ? to_enclosed_unpacked_expression(index_id) :
+		                                                       join("u32(", to_unpacked_expression(index_id), ")");
+		if (!dynamic_offset.empty())
+			dynamic_offset += " + ";
+		dynamic_offset += stride == 1 ? index : join(index, " * ", stride, "u");
+		forward = forward && should_forward(index_id);
+		dynamic_indices.push_back(index_id);
+	};
+
+	uint32_t type_id = get_pointee_type_id(expression_type_id(base));
+	uint32_t i = 0;
+	if (ptr_chain)
+	{
+		// The element stride of OpPtrAccessChain is decorated on the pointer type.
+		add_index(indices[0], get_decoration(expression_type_id(base), DecorationArrayStride));
+		i = 1;
+	}
+
+	for (; i < count; i++)
+	{
+		auto &type = get<SPIRType>(type_id);
+		if (!type.array.empty())
+		{
+			add_index(indices[i], get_decoration(type_id, DecorationArrayStride));
+			type_id = type.parent_type;
+		}
+		else if (type.basetype == SPIRType::Struct)
+		{
+			uint32_t member = get<SPIRConstant>(indices[i]).scalar();
+			const_offset += get_member_decoration(type.self, member, DecorationOffset);
+			layout = { get_member_decoration(type.self, member, DecorationMatrixStride),
+				       has_member_decoration(type.self, member, DecorationRowMajor) };
+			type_id = type.member_types[member];
+		}
+		else if (type.columns > 1)
+		{
+			// A column of a row-major matrix is not contiguous, so it cannot be addressed by a pointer.
+			if (layout.row_major)
+				SPIRV_CROSS_THROW("Pointers to columns of row-major matrices are not supported through buffer device "
+				                  "addresses in WGSL.");
+			add_index(indices[i], layout.matrix_stride);
+			type_id = type.parent_type;
+		}
+		else
+		{
+			add_index(indices[i], type.width / 8);
+			type_id = type.parent_type;
+		}
+	}
+
+	string offset = dynamic_offset;
+	if (const_offset)
+		offset = offset.empty() ? join(const_offset, "u") : join(offset, " + ", const_offset, "u");
+
+	string expr =
+	    offset.empty() ? to_expression(base) : join(to_enclosed_expression(base), " + vec2u(", offset, ", 0u)");
+	emit_op(result_type, id, expr, forward);
+	inherit_expression_dependencies(id, base);
+	for (auto index_id : dynamic_indices)
+		inherit_expression_dependencies(id, index_id);
+	bda_pointer_layouts[id] = layout;
+}
+
+void CompilerWGSL::analyze_bda_structs()
+{
+	// Collects the structs reachable from a type, without following physical pointers.
+	unordered_set<uint32_t> visited;
+	function<void(uint32_t, unordered_set<uint32_t> &)> collect = [&](uint32_t type_id, unordered_set<uint32_t> &out)
+	{
+		auto &type = ir.ids[type_id].get<SPIRType>();
+		if (is_physical_pointer(type))
+			return;
+		if (type.pointer || !type.array.empty())
+		{
+			collect(type.parent_type, out);
+			return;
+		}
+		if (type.basetype != SPIRType::Struct || !out.insert(type.self).second)
+			return;
+		for (auto member : type.member_types)
+			collect(member, out);
+	};
+
+	unordered_set<uint32_t> bda_structs, buffer_structs;
+	ir.for_each_typed_id<SPIRType>(
+	    [&](uint32_t, SPIRType &type)
+	    {
+		    if (is_physical_pointer(type))
+			    collect(type.parent_type, bda_structs);
+	    });
+	ir.for_each_typed_id<SPIRVariable>(
+	    [&](uint32_t, SPIRVariable &var)
+	    {
+		    if (var.storage == StorageClassUniform || var.storage == StorageClassStorageBuffer ||
+		        var.storage == StorageClassPushConstant)
+			    collect(var.basetype, buffer_structs);
+	    });
+
+	for (auto id : bda_structs)
+		if (!buffer_structs.count(id))
+			bda_only_structs.insert(id);
+}
+
+void CompilerWGSL::emit_bda_functions()
+{
+	auto &opts = wgsl_options;
+	const char *access = opts.bda_arenas_writable ? "read_write" : "read";
+	for (uint32_t i = 1; i <= opts.bda_arena_count; i++)
+		statement("@group(", opts.bda_arena_group, ") @binding(", opts.bda_arena_binding + i - 1, ") var<storage, ",
+		          access, "> spvBdaArena", i, " : array<u32>;");
+	statement("");
+
+	// A pointer is (byte offset, arena), arena 0 being null.
+	statement("fn spvBdaLoad(p : vec2u) -> u32");
+	begin_scope();
+	statement("let i = p.x >> 2u;");
+	statement("switch p.y");
+	begin_scope();
+	for (uint32_t i = 1; i <= opts.bda_arena_count; i++)
+		statement("case ", i, "u: { return spvBdaArena", i, "[i]; }");
+	statement("default: { return 0u; }");
+	end_scope();
+	end_scope();
+	statement("");
+
+	if (requires_bda_stores)
+	{
+		statement("fn spvBdaStore(p : vec2u, v : u32)");
+		begin_scope();
+		statement("let i = p.x >> 2u;");
+		statement("switch p.y");
+		begin_scope();
+		for (uint32_t i = 1; i <= opts.bda_arena_count; i++)
+			statement("case ", i, "u: { spvBdaArena", i, "[i] = v; }");
+		statement("default: {}");
+		end_scope();
+		end_scope();
+		statement("");
+	}
+
+	// Emitting the accessors does not register new ones, but iterate over copies to be safe.
+	auto loads = bda_loads;
+	for (auto &acc : loads)
+	{
+		auto &type = get<SPIRType>(acc.second.type_id);
+		auto &layout = acc.second.layout;
+		string type_name = type_to_glsl(type);
+		statement("fn spvBdaLoad_", acc.first, "(p : vec2u) -> ", type_name);
+		begin_scope();
+		if (is_physical_pointer(type))
+			statement("return vec2u(spvBdaLoad(p), spvBdaLoad(p + vec2u(4u, 0u)));");
+		else if (!type.array.empty())
+		{
+			uint32_t stride = get_decoration(acc.second.type_id, DecorationArrayStride);
+			statement("var r : ", type_name, ";");
+			statement("for (var i = 0u; i < ", type.array.back(), "u; i++)");
+			begin_scope();
+			statement("r[i] = ", bda_load(type.parent_type, layout, join("p + vec2u(i * ", stride, "u, 0u)")), ";");
+			end_scope();
+			statement("return r;");
+		}
+		else if (type.basetype == SPIRType::Struct)
+		{
+			SmallVector<string> members;
+			for (uint32_t i = 0; i < uint32_t(type.member_types.size()); i++)
+			{
+				BdaLayout member_layout = { get_member_decoration(type.self, i, DecorationMatrixStride),
+					                        has_member_decoration(type.self, i, DecorationRowMajor) };
+				members.push_back(bda_load(type.member_types[i], member_layout,
+				                           bda_offset("p", get_member_decoration(type.self, i, DecorationOffset))));
+			}
+			statement("return ", type_name, "(", merge(members), ");");
+		}
+		else
+		{
+			// Vectors, and matrices made of column vectors.
+			if (type.columns > 1 && !layout.matrix_stride)
+				SPIRV_CROSS_THROW("Matrix accessed through a buffer device address has no matrix stride.");
+			uint32_t scalar_size = type.width / 8;
+			SmallVector<string> columns;
+			for (uint32_t c = 0; c < type.columns; c++)
+			{
+				SmallVector<string> components;
+				for (uint32_t r = 0; r < type.vecsize; r++)
+				{
+					uint32_t offset = layout.row_major ? r * layout.matrix_stride + c * scalar_size :
+					                                     c * layout.matrix_stride + r * scalar_size;
+					components.push_back(bda_scalar_load(type, bda_offset("p", offset)));
+				}
+				columns.push_back(type.columns > 1 ? join(type_to_glsl(get<SPIRType>(type.parent_type)), "(",
+				                                          merge(components), ")") :
+				                                     merge(components));
+			}
+			statement("return ", type_name, "(", merge(columns), ");");
+		}
+		end_scope();
+		statement("");
+	}
+
+	auto stores = bda_stores;
+	for (auto &acc : stores)
+	{
+		auto &type = get<SPIRType>(acc.second.type_id);
+		auto &layout = acc.second.layout;
+		statement("fn spvBdaStore_", acc.first, "(p : vec2u, v : ", type_to_glsl(type), ")");
+		begin_scope();
+		if (is_physical_pointer(type))
+		{
+			statement("spvBdaStore(p, v.x);");
+			statement("spvBdaStore(p + vec2u(4u, 0u), v.y);");
+		}
+		else if (!type.array.empty())
+		{
+			uint32_t stride = get_decoration(acc.second.type_id, DecorationArrayStride);
+			statement("for (var i = 0u; i < ", type.array.back(), "u; i++)");
+			begin_scope();
+			statement(bda_store(type.parent_type, layout, join("p + vec2u(i * ", stride, "u, 0u)"), "v[i]"), ";");
+			end_scope();
+		}
+		else if (type.basetype == SPIRType::Struct)
+		{
+			for (uint32_t i = 0; i < uint32_t(type.member_types.size()); i++)
+			{
+				BdaLayout member_layout = { get_member_decoration(type.self, i, DecorationMatrixStride),
+					                        has_member_decoration(type.self, i, DecorationRowMajor) };
+				statement(bda_store(type.member_types[i], member_layout,
+				                    bda_offset("p", get_member_decoration(type.self, i, DecorationOffset)),
+				                    join("v.", to_member_name(type, i))),
+				          ";");
+			}
+		}
+		else
+		{
+			if (type.columns > 1 && !layout.matrix_stride)
+				SPIRV_CROSS_THROW("Matrix accessed through a buffer device address has no matrix stride.");
+			uint32_t scalar_size = type.width / 8;
+			for (uint32_t c = 0; c < type.columns; c++)
+			{
+				for (uint32_t r = 0; r < type.vecsize; r++)
+				{
+					uint32_t offset = layout.row_major ? r * layout.matrix_stride + c * scalar_size :
+					                                     c * layout.matrix_stride + r * scalar_size;
+					string value = type.columns > 1 ? join("v[", c, "][", r, "]") : join("v[", r, "]");
+					statement(bda_scalar_store(type, bda_offset("p", offset), value), ";");
+				}
+			}
+		}
+		end_scope();
+		statement("");
+	}
 }
 
 void CompilerWGSL::emit_uniform(const SPIRVariable &var)
 {
 	auto &type = get<SPIRType>(var.basetype);
+	if (is_resource_table_variable(var.self))
+		return;
 	if (!type.array.empty())
 		SPIRV_CROSS_THROW("Arrays of textures and samplers are not supported in WGSL.");
 
@@ -3022,6 +3556,23 @@ void CompilerWGSL::add_stage_io_builtin(SmallVector<StageIOMember> &members, Bui
 		}
 		if (builtin == BuiltInPosition && storage == StorageClassInput)
 			return;
+		if (builtin == BuiltInBaseVertex || builtin == BuiltInBaseInstance)
+		{
+			// The private variable is zero-initialized and never written, so it reads as zero.
+			warn(WGSL_WARNING_ZERO_BASE_VERTEX_INSTANCE,
+			     join(builtin_to_glsl(builtin, storage), " is not available in WGSL and reads as zero: ",
+			          builtin == BuiltInBaseVertex ? "vertex_index" : "instance_index",
+			          " includes the base, so subtracting it gives a different result than in Vulkan for a "
+			          "non-zero base."));
+			return;
+		}
+		if (builtin == BuiltInViewIndex && storage == StorageClassInput)
+		{
+			// WebGPU has no multiview: rendering without a view mask has only view 0.
+			warn(WGSL_WARNING_IGNORED_BUILTIN,
+			     "gl_ViewIndex is not available in WGSL and reads as zero, as without multiview.");
+			return;
+		}
 		if (builtin == BuiltInClipDistance)
 		{
 			warn(WGSL_WARNING_IGNORED_BUILTIN,
@@ -3193,9 +3744,15 @@ void CompilerWGSL::emit_entry_point_wrapper()
 	{
 		SpecializationConstant wg_x, wg_y, wg_z;
 		get_work_group_size_specialization_constants(wg_x, wg_y, wg_z);
-		string x = wg_x.id ? to_name(wg_x.id) : convert_to_string(execution.workgroup_size.x);
-		string y = wg_y.id ? to_name(wg_y.id) : convert_to_string(execution.workgroup_size.y);
-		string z = wg_z.id ? to_name(wg_z.id) : convert_to_string(execution.workgroup_size.z);
+		// With LocalSizeId, the sizes which are not specialized are constants, which workgroup_size.x/y/z do not have.
+		auto size = [&](const SpecializationConstant &wg, uint32_t index) -> string {
+			if (wg.id)
+				return to_name(wg.id);
+			return convert_to_string(get_execution_mode_argument(ExecutionModeLocalSize, index));
+		};
+		string x = size(wg_x, 0);
+		string y = size(wg_y, 1);
+		string z = size(wg_z, 2);
 		statement("@compute @workgroup_size(", x, ", ", y, ", ", z, ")");
 		break;
 	}
@@ -4059,8 +4616,67 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 	auto int_type = to_signed_basetype(integer_width);
 	auto uint_type = to_unsigned_basetype(integer_width);
 
+	if (opcode >= OpAtomicLoad && opcode <= OpAtomicXor && is_bda_pointer(ops[opcode == OpAtomicStore ? 0 : 2]))
+		SPIRV_CROSS_THROW("Atomics through buffer device addresses are not supported in WGSL.");
+
 	switch (opcode)
 	{
+	case OpPtrAccessChain:
+	case OpInBoundsPtrAccessChain:
+		if (is_bda_pointer(ops[2]))
+		{
+			emit_bda_access_chain(ops[0], ops[1], ops[2], &ops[3], length - 3, true);
+			break;
+		}
+		CompilerGLSL::emit_instruction(instruction);
+		break;
+
+	case OpConvertUToPtr:
+	case OpConvertPtrToU:
+		if (is_physical_pointer(get<SPIRType>(ops[0])) || is_bda_pointer(ops[2]))
+			SPIRV_CROSS_THROW("WGSL has no 64-bit integers, so buffer device addresses can only be converted from "
+			                  "and to uvec2 (GL_EXT_buffer_reference_uvec2).");
+		CompilerGLSL::emit_instruction(instruction);
+		break;
+
+	case OpBitcast:
+		// Pointers are vec2u, so casts from and to uvec2 are no-ops.
+		if (is_physical_pointer(get<SPIRType>(ops[0])) || is_bda_pointer(ops[2]))
+		{
+			auto &out_type = get<SPIRType>(ops[0]);
+			auto &in_type = expression_type(ops[2]);
+			auto &other = is_physical_pointer(out_type) ? in_type : out_type;
+			if (!is_physical_pointer(other) && !(other.basetype == SPIRType::UInt && other.width == 32 &&
+			                                      other.vecsize == 2 && other.columns == 1))
+				SPIRV_CROSS_THROW("Buffer device addresses can only be cast from and to uvec2 in WGSL.");
+			emit_op(ops[0], ops[1], to_unpacked_expression(ops[2]), should_forward(ops[2]));
+			inherit_expression_dependencies(ops[1], ops[2]);
+			break;
+		}
+		CompilerGLSL::emit_instruction(instruction);
+		break;
+
+	case OpAccessChain:
+	case OpInBoundsAccessChain:
+	{
+		if (is_bda_pointer(ops[2]))
+		{
+			emit_bda_access_chain(ops[0], ops[1], ops[2], &ops[3], length - 3, false);
+			break;
+		}
+		// Resource table arrays are not declared, an element is fetched with getResource<T>(slot) instead.
+		// Handles cannot be stored in variables, so the expression is always forwarded to its use.
+		if (length == 4 && is_resource_table_variable(ops[2]))
+		{
+			require_enable(requires_resource_table);
+			set<SPIRExpression>(ops[1], resource_table_access(ops[2], ops[3]), ops[0], true);
+			inherit_expression_dependencies(ops[1], ops[3]);
+			break;
+		}
+		CompilerGLSL::emit_instruction(instruction);
+		break;
+	}
+
 	case OpSNegate:
 	{
 		// WGSL has no unary minus for unsigned integers, so negate by subtracting from zero, which wraps.
@@ -4081,6 +4697,16 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 
 	case OpLoad:
 	{
+		if (is_bda_pointer(ops[2]))
+		{
+			auto itr = bda_pointer_layouts.find(ops[2]);
+			auto expr = bda_load(ops[0], itr != bda_pointer_layouts.end() ? itr->second : BdaLayout{},
+			                     to_unpacked_expression(ops[2]));
+			// Memory may be written through another pointer, so loads are never forwarded.
+			emit_op(ops[0], ops[1], expr, false);
+			inherit_expression_dependencies(ops[1], ops[2]);
+			break;
+		}
 		if (is_atomic_pointer(ops[2]))
 		{
 			uint32_t result_type = ops[0];
@@ -4100,6 +4726,16 @@ void CompilerWGSL::emit_instruction(const Instruction &instruction)
 
 	case OpStore:
 	{
+		if (is_bda_pointer(ops[0]))
+		{
+			auto itr = bda_pointer_layouts.find(ops[0]);
+			statement(bda_store(expression_type_id(ops[1]),
+			                    itr != bda_pointer_layouts.end() ? itr->second : BdaLayout{},
+			                    to_unpacked_expression(ops[0]), to_unpacked_expression(ops[1])),
+			          ";");
+			register_write(ops[0]);
+			break;
+		}
 		if (is_atomic_pointer(ops[0]))
 		{
 			auto atomic_type = expression_type(ops[1]);

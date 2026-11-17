@@ -25,6 +25,8 @@
 #define SPIRV_WGSL_HPP
 
 #include "spirv_glsl.hpp"
+#include <map>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace SPIRV_CROSS_NAMESPACE
@@ -70,6 +72,13 @@ enum WGSLWarning
 	// compare-exchange loop.
 	WGSL_WARNING_ATOMIC_MIN_MAX_EMULATION,
 
+	// BaseVertex / BaseInstance read as zero. WGSL's vertex_index and instance_index include the base vertex and
+	// base instance (like gl_VertexIndex and gl_InstanceIndex), so "(InstanceIndex - BaseInstance) + BaseInstance"
+	// still evaluates to instance_index. But "VertexIndex - BaseVertex", which Slang emits for SV_VertexID (and
+	// SV_InstanceID alike), then includes the base, unlike in Vulkan: they differ when the draw has a non-zero
+	// vertex offset or first instance. A shader which reads the base on its own gets zero.
+	WGSL_WARNING_ZERO_BASE_VERTEX_INSTANCE,
+
 	WGSL_WARNING_COUNT
 };
 
@@ -103,6 +112,35 @@ public:
 		// but WGSL rejects them by default. If enabled, shaders using implicit derivatives
 		// emit "diagnostic(off, derivative_uniformity);".
 		bool allow_non_uniform_derivatives = true;
+
+		// Bindless: arrays of textures and samplers in resource_table_group are not declared. Indexing one fetches
+		// the element from the resource table with getResource<T>(slot), where slot is the array index plus the
+		// offset of the array's binding in resource_table_binding_offsets (0 if absent). This lets several
+		// arrays with separate index spaces, e.g. textures and samplers, share one table.
+		bool use_resource_table = false;
+		uint32_t resource_table_group = 0;
+		std::unordered_map<uint32_t, uint32_t> resource_table_binding_offsets;
+
+		// Buffer device addresses: a physical storage buffer pointer is a vec2u of (byte offset, arena), arena 0
+		// being null. Arena i in [1, bda_arena_count] is an array<u32> storage buffer declared at
+		// @group(bda_arena_group) @binding(bda_arena_binding + i - 1). Loads and stores are split into 32-bit
+		// words, so addresses must be 4-byte aligned. 0 arenas keeps buffer device addresses unsupported.
+		uint32_t bda_arena_count = 0;
+		uint32_t bda_arena_group = 1;
+		uint32_t bda_arena_binding = 0;
+		// Arenas are read-only unless enabled, since vertex shaders cannot use writable storage buffers.
+		bool bda_arenas_writable = false;
+
+		// Declare push constant blocks as var<immediate> (set with setImmediates()) instead of a uniform buffer at
+		// push_constant_group / push_constant_binding. WGSL does not allow arrays in immediate data, and the block
+		// must fit in immediate_size_limit bytes (the WGSL limit is 64, the device limit is maxImmediateSize).
+		bool push_constants_as_immediates = false;
+		uint32_t immediate_size_limit = 64;
+
+		// Declare push constant blocks which are not immediates as var<storage, read> instead of var<uniform>. The
+		// storage address space has the std430 layout of push constants, while the uniform address space needs
+		// 16-byte array strides and 16-byte aligned structs.
+		bool push_constants_as_storage = false;
 	};
 
 	explicit CompilerWGSL(std::vector<uint32_t> spirv_)
@@ -309,6 +347,43 @@ private:
 	bool uses_implicit_derivatives = false;
 	bool requires_non_finite_helper = false;
 	bool uses_workgroup_size_constant = false;
+	bool requires_resource_table = false;
+	bool requires_immediates = false;
+	bool is_resource_table_variable(uint32_t id) const;
+	std::string resource_table_access(uint32_t var_id, uint32_t index_id);
+
+	// Matrix layout of the value a physical pointer points to, from the decorations of the enclosing struct member.
+	struct BdaLayout
+	{
+		uint32_t matrix_stride = 0;
+		bool row_major = false;
+	};
+	struct BdaAccessor
+	{
+		uint32_t type_id = 0;
+		BdaLayout layout;
+	};
+	// Generated load and store functions of composite types, keyed by the suffix of the function name.
+	std::map<std::string, BdaAccessor> bda_loads;
+	std::map<std::string, BdaAccessor> bda_stores;
+	std::unordered_map<uint32_t, BdaLayout> bda_pointer_layouts;
+	bool requires_bda_arenas = false;
+	bool requires_bda_stores = false;
+	bool is_bda_pointer(uint32_t id);
+	std::string bda_tag(uint32_t type_id, const BdaLayout &layout);
+	std::string register_bda_accessor(std::map<std::string, BdaAccessor> &accessors, uint32_t type_id,
+	                                  const BdaLayout &layout);
+	std::string bda_scalar_load(const SPIRType &type, const std::string &ptr);
+	std::string bda_scalar_store(const SPIRType &type, const std::string &ptr, const std::string &value);
+	std::string bda_load(uint32_t type_id, const BdaLayout &layout, const std::string &ptr);
+	std::string bda_store(uint32_t type_id, const BdaLayout &layout, const std::string &ptr, const std::string &value);
+	void emit_bda_access_chain(uint32_t result_type, uint32_t id, uint32_t base, const uint32_t *indices,
+	                           uint32_t count, bool ptr_chain);
+	void emit_bda_functions();
+	// Structs only reachable through buffer device addresses. Arena accessors use the SPIR-V offsets, so these are
+	// declared as plain value types, without matching the memory layout (e.g. scalar block layout).
+	std::unordered_set<uint32_t> bda_only_structs;
+	void analyze_bda_structs();
 
 	// Bindings assigned by resolve_binding_conflicts(), for textures/buffers/samplers and for the sampler part
 	// of combined image samplers.

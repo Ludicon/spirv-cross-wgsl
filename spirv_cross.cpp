@@ -4822,11 +4822,16 @@ void Compiler::analyze_image_and_sampler_usage()
 			comparison_ids.insert(combined.combined_id);
 }
 
-bool Compiler::CombinedImageSamplerDrefHandler::handle(Op opcode, const uint32_t *args, uint32_t)
+bool Compiler::CombinedImageSamplerDrefHandler::handle(Op opcode, const uint32_t *args, uint32_t length)
 {
 	// Mark all sampled images which are used with Dref.
 	switch (opcode)
 	{
+	case OpCopyObject:
+		if (length >= 3)
+			copy_sources[args[1]] = args[2];
+		return true;
+
 	case OpImageSampleDrefExplicitLod:
 	case OpImageSampleDrefImplicitLod:
 	case OpImageSampleProjDrefExplicitLod:
@@ -4837,8 +4842,19 @@ bool Compiler::CombinedImageSamplerDrefHandler::handle(Op opcode, const uint32_t
 	case OpImageSparseSampleDrefExplicitLod:
 	case OpImageDrefGather:
 	case OpImageSparseDrefGather:
-		dref_combined_samplers.insert(args[2]);
+	{
+		// Also mark the sampled image a copy was made from, so the comparison state reaches the OpSampledImage.
+		uint32_t id = args[2];
+		for (;;)
+		{
+			dref_combined_samplers.insert(id);
+			auto itr = copy_sources.find(id);
+			if (itr == copy_sources.end())
+				break;
+			id = itr->second;
+		}
 		return true;
+	}
 
 	default:
 		break;
