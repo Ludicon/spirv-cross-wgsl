@@ -353,14 +353,15 @@ private:
 	std::string resource_table_access(uint32_t var_id, uint32_t index_id);
 
 	// Matrix layout of the value a physical pointer points to, from the decorations of the enclosing struct member.
+	// Plain aggregates without default member initializers, so brace initialization also compiles as C++11.
 	struct BdaLayout
 	{
-		uint32_t matrix_stride = 0;
-		bool row_major = false;
+		uint32_t matrix_stride;
+		bool row_major;
 	};
 	struct BdaAccessor
 	{
-		uint32_t type_id = 0;
+		uint32_t type_id;
 		BdaLayout layout;
 	};
 	// Generated load and store functions of composite types, keyed by the suffix of the function name.
