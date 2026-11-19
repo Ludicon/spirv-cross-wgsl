@@ -6,6 +6,19 @@ layout(local_size_x = 64) in;
 layout(std430, binding = 0) readonly buffer Input { uvec2 inputs[]; };
 layout(std430, binding = 1) writeonly buffer Output { uint outputs[]; };
 
+struct S
+{
+    mediump uint v;
+    uint w;
+};
+
+shared mediump uint sh[64];
+
+void inout_param(inout mediump uint a, highp uint b)
+{
+    a |= b;
+}
+
 // PowerVR GLES drivers drop bitwise compound assignments (|=, &=, ^=) whose left operand is
 // mediump or lowp and whose right operand is highp, so these must be emitted as "a = a | b".
 // highp left operands can still use the compound form.
@@ -32,6 +45,26 @@ void main()
     mediump uvec2 c = uvec2(x, 0u);
     c |= uvec2(y);
 
+    // Other kinds of mediump l-values.
+    mediump uint arr[2] = uint[2](0u, x);
+    uint i = (y >> 20u) & 1u;
+    arr[i] |= y;
+
+    S st;
+    st.v = x;
+    st.w = 0u;
+    st.v |= y;
+
+    mediump uvec2 vec = uvec2(x, 0u);
+    vec.x |= y;
+    vec[i] ^= y;
+
+    sh[gl_LocalInvocationID.x] = x;
+    sh[gl_LocalInvocationID.x] &= y;
+
+    mediump uint p = x;
+    inout_param(p, y);
+
     highp uint h = x;
     h |= y;
     h &= y;
@@ -39,5 +72,5 @@ void main()
     h <<= s;
     h >>= s;
 
-    outputs[idx] = a + b + c.x + c.y + d + h;
+    outputs[idx] = a + b + c.x + c.y + d + h + arr[i] + st.v + vec.x + sh[gl_LocalInvocationID.x] + p;
 }
