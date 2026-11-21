@@ -1014,6 +1014,8 @@ protected:
 		bool handle(Op opcode, const uint32_t *args, uint32_t length) override;
 
 		std::unordered_set<uint32_t> dref_combined_samplers;
+		// OpCopyObject result -> source, e.g. for nonuniformEXT(sampler2DShadow(...)) in GLSL.
+		std::unordered_map<uint32_t, uint32_t> copy_sources;
 	};
 
 	struct CombinedImageSamplerUsageHandler : OpcodeHandler
