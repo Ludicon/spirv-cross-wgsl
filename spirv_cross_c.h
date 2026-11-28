@@ -40,7 +40,7 @@ extern "C" {
 /* Bumped if ABI or API breaks backwards compatibility. */
 #define SPVC_C_API_VERSION_MAJOR 0
 /* Bumped if APIs or enumerations are added in a backwards compatible way. */
-#define SPVC_C_API_VERSION_MINOR 68
+#define SPVC_C_API_VERSION_MINOR 69
 /* Bumped if internal implementation details change. */
 #define SPVC_C_API_VERSION_PATCH 0
 
@@ -755,6 +755,8 @@ typedef enum spvc_compiler_option
 
 	SPVC_COMPILER_OPTION_HLSL_USER_SEMANTIC = 94 | SPVC_COMPILER_OPTION_HLSL_BIT,
 
+	SPVC_COMPILER_OPTION_MSL_INSTANCE_RELATIVE_PATCH_ID = 95 | SPVC_COMPILER_OPTION_MSL_BIT,
+
 	SPVC_COMPILER_OPTION_INT_MAX = 0x7fffffff
 } spvc_compiler_option;
 
@@ -795,7 +797,11 @@ SPVC_PUBLIC_API spvc_result spvc_context_create_compiler(spvc_context context, s
 /* Maps directly to C++ API. */
 SPVC_PUBLIC_API unsigned spvc_compiler_get_current_id_bound(spvc_compiler compiler);
 
-/* Create compiler options, which will initialize defaults. */
+/*
+ * Create compiler options, initialized from the options currently set on the compiler.
+ * For a newly created compiler, these are the defaults.
+ * After spvc_compiler_install_compiler_options(), new options objects inherit the installed values.
+ */
 SPVC_PUBLIC_API spvc_result spvc_compiler_create_compiler_options(spvc_compiler compiler,
                                                                   spvc_compiler_options *options);
 /* Override options. Will return error if e.g. MSL options are used for the HLSL backend, etc. */
