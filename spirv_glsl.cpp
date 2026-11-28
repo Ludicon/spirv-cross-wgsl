@@ -1783,7 +1783,7 @@ uint32_t CompilerGLSL::type_to_packed_alignment(const SPIRType &type, const Bits
 		uint32_t alignment = 1;
 		for (uint32_t i = 0; i < type.member_types.size(); i++)
 		{
-			auto member_flags = ir.meta[type.self].members[i].decoration_flags;
+			auto member_flags = ir.get_member_decoration_bitset(type.self, i);
 			alignment =
 			    max(alignment, type_to_packed_alignment(get<SPIRType>(type.member_types[i]), member_flags, packing));
 		}
@@ -1927,7 +1927,7 @@ uint32_t CompilerGLSL::type_to_packed_size(const SPIRType &type, const Bitset &f
 
 		for (uint32_t i = 0; i < type.member_types.size(); i++)
 		{
-			auto member_flags = ir.meta[type.self].members[i].decoration_flags;
+			auto member_flags = ir.get_member_decoration_bitset(type.self, i);
 			auto &member_type = get<SPIRType>(type.member_types[i]);
 
 			uint32_t packed_alignment = type_to_packed_alignment(member_type, member_flags, packing);
@@ -2027,8 +2027,7 @@ bool CompilerGLSL::buffer_is_packing_standard(const SPIRType &type, BufferPackin
 	{
 		auto &memb_type = get<SPIRType>(type.member_types[i]);
 
-		auto *type_meta = ir.find_meta(type.self);
-		auto member_flags = type_meta ? type_meta->members[i].decoration_flags : Bitset{};
+		auto member_flags = ir.get_member_decoration_bitset(type.self, i);
 
 		// Verify alignment rules.
 		uint32_t packed_alignment = type_to_packed_alignment(memb_type, member_flags, packing);
@@ -2773,6 +2772,9 @@ void CompilerGLSL::emit_buffer_block_native(const SPIRVariable *var, const Descr
 
 	bool ssbo = storage == StorageClassStorageBuffer || storage == StorageClassShaderRecordBufferKHR ||
 	            has_decoration(type->self, DecorationBufferBlock);
+
+	if (ssbo && !options.es && options.version < 430)
+		require_extension_internal("GL_ARB_shader_storage_buffer_object");
 
 	bool shared = storage == StorageClassWorkgroup;
 	if (shared)
@@ -5783,6 +5785,51 @@ string CompilerGLSL::to_extract_constant_composite_expression(uint32_t result_ty
 	return constant_expression(tmp);
 }
 
+void CompilerGLSL::reroll_composite_insert_extract(std::string &expr, const SPIRType &expression_type,
+	const SPIRType &return_type, const SPIRType &composite_type, const uint32_t *chain, uint32_t count)
+{
+	const SPIRType *remapped_bool_struct_type = nullptr;
+	const auto *obj_type = &composite_type;
+
+	if (backend.boolean_in_struct_remapped_type != SPIRType::Boolean && expression_type.basetype == SPIRType::Boolean)
+	{
+		for (uint32_t i = 0; i < count; i++)
+		{
+			if (is_array(*obj_type))
+			{
+				obj_type = &get<SPIRType>(obj_type->parent_type);
+			}
+			else if (obj_type->basetype == SPIRType::Struct)
+			{
+				remapped_bool_struct_type = obj_type;
+				obj_type = &get<SPIRType>(obj_type->member_types[chain[i]]);
+			}
+			else if (obj_type->parent_type)
+			{
+				obj_type = &get<SPIRType>(obj_type->parent_type);
+			}
+		}
+	}
+
+	if (remapped_bool_struct_type)
+	{
+		if (is_array(*obj_type))
+		{
+			expr = to_rerolled_array_expression(return_type, expr, *obj_type);
+		}
+		else if (return_type.basetype == SPIRType::Struct)
+		{
+			auto tmp_type = *obj_type;
+			tmp_type.basetype = backend.boolean_in_struct_remapped_type;
+			expr = join(type_to_glsl(tmp_type), "(", expr, ")");
+		}
+		else
+		{
+			expr = join(type_to_glsl(*obj_type), "(", expr, ")");
+		}
+	}
+}
+
 string CompilerGLSL::to_rerolled_array_expression(const SPIRType &parent_type,
                                                   const string &base_expr, const SPIRType &type)
 {
@@ -8012,7 +8059,7 @@ string CompilerGLSL::legacy_tex_op(const std::string &op, const SPIRType &imgtyp
 	// GLES has very limited support for shadow samplers.
 	// Basically shadow2D and shadow2DProj work through EXT_shadow_samplers,
 	// everything else can just throw
-	bool is_comparison = is_depth_image(imgtype, tex);
+	bool is_comparison = is_depth_image(tex);
 	if (is_comparison && is_legacy_es())
 	{
 		if (op == "texture" || op == "textureProj")
@@ -8226,7 +8273,7 @@ void CompilerGLSL::emit_mix_op(uint32_t result_type, uint32_t id, uint32_t left,
 		emit_trinary_func_op(result_type, id, left, right, lerp, "mix");
 }
 
-string CompilerGLSL::to_combined_image_sampler(VariableID image_id, VariableID samp_id)
+string CompilerGLSL::to_combined_image_sampler(VariableID image_id, VariableID samp_id, VariableID &out_combined_id)
 {
 	// Keep track of the array indices we have used to load the image.
 	// We'll need to use the same array index into the combined image sampler array.
@@ -8237,6 +8284,8 @@ string CompilerGLSL::to_combined_image_sampler(VariableID image_id, VariableID s
 		array_expr = image_expr.substr(array_index, string::npos);
 
 	auto &args = current_function->arguments;
+
+	out_combined_id = 0;
 
 	// For GLSL and ESSL targets, we must enumerate all possible combinations for sampler2D(texture2D, sampler) and redirect
 	// all possible combinations into new sampler2D uniforms.
@@ -8268,7 +8317,10 @@ string CompilerGLSL::to_combined_image_sampler(VariableID image_id, VariableID s
 		});
 
 		if (itr != end(combined))
+		{
+			out_combined_id = itr->id;
 			return to_expression(itr->id) + array_expr;
+		}
 		else
 		{
 			SPIRV_CROSS_THROW("Cannot find mapping for combined sampler parameter, was "
@@ -8285,7 +8337,10 @@ string CompilerGLSL::to_combined_image_sampler(VariableID image_id, VariableID s
 		});
 
 		if (itr != end(combined_image_samplers))
+		{
+			out_combined_id = itr->combined_id;
 			return to_expression(itr->combined_id) + array_expr;
+		}
 		else
 		{
 			SPIRV_CROSS_THROW("Cannot find mapping for combined sampler, was build_combined_image_samplers() used "
@@ -8344,7 +8399,8 @@ void CompilerGLSL::emit_sampled_image_op(uint32_t result_type, uint32_t result_i
 	else
 	{
 		// Make sure to suppress usage tracking. It is illegal to create temporaries of opaque types.
-		emit_op(result_type, result_id, to_combined_image_sampler(image_id, samp_id), true, true);
+		VariableID combined_id;
+		emit_op(result_type, result_id, to_combined_image_sampler(image_id, samp_id, combined_id), true, true);
 	}
 
 	// Make sure to suppress usage tracking and any expression invalidation.
@@ -8637,7 +8693,7 @@ std::string CompilerGLSL::to_texture_op(const Instruction &i, bool sparse, bool 
 	if (bias != 0 && dref != 0 && !fetch && !gather &&
 	    ((imgtype.image.arrayed && imgtype.image.dim == Dim2D) ||
 	     (imgtype.image.arrayed && imgtype.image.dim == DimCube)) &&
-	    is_depth_image(imgtype, img))
+	    is_depth_image(img))
 	{
 		require_extension_internal("GL_EXT_texture_shadow_lod");
 	}
@@ -8687,7 +8743,7 @@ std::string CompilerGLSL::to_texture_op(const Instruction &i, bool sparse, bool 
 	expr += ")";
 
 	// texture(samplerXShadow) returns float. shadowX() returns vec4, but only in desktop GLSL. Swizzle here.
-	if (is_legacy() && !options.es && is_depth_image(imgtype, img))
+	if (is_legacy() && !options.es && is_depth_image(img))
 		expr += ".r";
 
 	// Sampling from a texture which was deduced to be a depth image, might actually return 1 component here.
@@ -8698,16 +8754,16 @@ std::string CompilerGLSL::to_texture_op(const Instruction &i, bool sparse, bool 
 		const auto *combined = maybe_get<SPIRCombinedImageSampler>(img);
 		VariableID image_id = combined ? combined->image : img;
 
-		if (combined && is_depth_image(imgtype, combined->image))
+		if (combined && is_depth_image(combined->image))
 			image_is_depth = true;
-		else if (is_depth_image(imgtype, img))
+		else if (is_depth_image(img))
 			image_is_depth = true;
 
 		// We must also check the backing variable for the image.
 		// We might have loaded an OpImage, and used that handle for two different purposes.
 		// Once with comparison, once without.
 		auto *image_variable = maybe_get_backing_variable(image_id);
-		if (image_variable && is_depth_image(get<SPIRType>(image_variable->basetype), image_variable->self))
+		if (image_variable && is_depth_image(image_variable->self))
 			image_is_depth = true;
 
 		if (image_is_depth)
@@ -8780,7 +8836,7 @@ string CompilerGLSL::to_function_name(const TextureFunctionNameArguments &args)
 	// This happens for HLSL SampleCmpLevelZero on Texture2DArray and TextureCube.
 	bool workaround_lod_array_shadow_as_grad = false;
 	if (((imgtype.image.arrayed && imgtype.image.dim == Dim2D) || imgtype.image.dim == DimCube) &&
-	    is_depth_image(imgtype, tex) && args.lod && !args.base.is_fetch)
+	    is_depth_image(tex) && args.lod && !args.base.is_fetch)
 	{
 		if (has_extension("GL_EXT_texture_shadow_lod") ||
 		    options.vulkan_semantics || !expression_is_constant_null(args.lod))
@@ -8859,7 +8915,8 @@ std::string CompilerGLSL::convert_separate_image_to_expression(uint32_t id)
 					SPIRV_CROSS_THROW("Cannot find dummy sampler ID. Was "
 					                  "build_dummy_sampler_for_combined_images() called?");
 
-				return to_combined_image_sampler(id, dummy_sampler_id);
+				VariableID combined_id;
+				return to_combined_image_sampler(id, dummy_sampler_id, combined_id);
 			}
 		}
 	}
@@ -8928,7 +8985,7 @@ string CompilerGLSL::to_function_args(const TextureFunctionArguments &args, bool
 	// If GL_EXT_texture_shadow_lod is in use, textureLod is available directly with arbitrary LOD.
 	bool workaround_lod_array_shadow_as_grad =
 	    ((imgtype.image.arrayed && imgtype.image.dim == Dim2D) || imgtype.image.dim == DimCube) &&
-	    is_depth_image(imgtype, img) && args.lod != 0 && !args.base.is_fetch &&
+	    is_depth_image(img) && args.lod != 0 && !args.base.is_fetch &&
 	    !has_extension("GL_EXT_texture_shadow_lod");
 
 	if (args.dref)
@@ -11001,6 +11058,11 @@ bool CompilerGLSL::access_chain_needs_stage_io_builtin_translation(uint32_t)
 	return true;
 }
 
+string CompilerGLSL::flattened_arrayed_builtin_name(uint32_t, BuiltIn)
+{
+	return {};
+}
+
 string CompilerGLSL::access_chain_internal(uint32_t base, const uint32_t *indices, uint32_t count,
                                            AccessChainFlags flags, AccessChainMeta *meta,
                                            const SPIRType *untyped_data_type)
@@ -11365,7 +11427,15 @@ string CompilerGLSL::access_chain_internal(uint32_t base, const uint32_t *indice
 				BuiltIn builtin = BuiltInMax;
 				if (is_member_builtin(*type, index, &builtin) && access_chain_needs_stage_io_builtin_translation(base))
 				{
-					if (access_chain_is_arrayed)
+					string flat_name = access_chain_is_arrayed ? flattened_arrayed_builtin_name(base, builtin) : string();
+					auto *flat_var = flat_name.empty() ? nullptr : maybe_get_backing_variable(base);
+					string block_name = flat_var ? to_name(flat_var->self) : string();
+					if (!block_name.empty() && expr.compare(0, block_name.size(), block_name) == 0)
+					{
+						// gl_in[i].gl_Position -> gl_PositionIn[i]: keep the subscripts, swap the block name.
+						expr = flat_name + expr.substr(block_name.size());
+					}
+					else if (access_chain_is_arrayed)
 					{
 						expr += ".";
 						expr += builtin_to_glsl(builtin, type->storage);
@@ -11500,6 +11570,9 @@ string CompilerGLSL::access_chain_internal(uint32_t base, const uint32_t *indice
 			else
 				ignore_potential_sliced_writes = true;
 
+			if (type->op == OpTypeCooperativeMatrixKHR)
+				expr += backend.cooperative_matrix_element_access;
+
 			if (!row_major_matrix_needs_conversion && !ignore_potential_sliced_writes)
 			{
 				// On some backends, we might not be able to safely access individual scalars in a vector.
@@ -11525,7 +11598,8 @@ string CompilerGLSL::access_chain_internal(uint32_t base, const uint32_t *indice
 					expr += join("[", out_of_bounds ? 0 : index, "]");
 				}
 			}
-			else if (ir.ids[index].get_type() == TypeConstant && !is_packed && !row_major_matrix_needs_conversion)
+			else if (ir.ids[index].get_type() == TypeConstant && !is_packed && !row_major_matrix_needs_conversion &&
+			         type->op != OpTypeCooperativeMatrixKHR)
 			{
 				auto &c = get<SPIRConstant>(index);
 				bool out_of_bounds = (c.scalar() >= type->vecsize);
@@ -13562,7 +13636,19 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 		{
 			auto image_id = combined.global_image ? combined.image_id : VariableID(arg[combined.image_id]);
 			auto sampler_id = combined.global_sampler ? combined.sampler_id : VariableID(arg[combined.sampler_id]);
-			arglist.push_back(to_combined_image_sampler(image_id, sampler_id));
+			VariableID combined_id;
+			auto expr = to_combined_image_sampler(image_id, sampler_id, combined_id);
+
+			// Need to propagate this state to the shadow arguments.
+			// The current setup is far too messy to set this up properly during analysis.
+			if (comparison_ids.count(combined_id))
+			{
+				assert(callee.combined_parameters.size() == callee.shadow_arguments.size());
+				if (comparison_ids.insert(callee.shadow_arguments[&combined - callee.combined_parameters.data()].id).second)
+					force_recompile();
+			}
+
+			arglist.push_back(expr);
 		}
 
 		append_global_func_args(callee, length, arglist);
@@ -13597,6 +13683,12 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 			// Set dependencies for them.
 			for (uint32_t i = 0; i < length; i++)
 				register_read(id, arg[i], forward);
+
+			// A forwarded call also depends on whatever its arguments depend on, e.g. on a
+			// variable that an argument such as -x loaded, which may be stored to before the
+			// result is used.
+			for (uint32_t i = 0; i < length; i++)
+				inherit_expression_dependencies(id, arg[i]);
 
 			// If we're going to forward the temporary result,
 			// put dependencies on every variable that must not change.
@@ -13831,6 +13923,9 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 			auto expr = access_chain_internal(ops[2], &ops[3], length,
 			                                  ACCESS_CHAIN_INDEX_IS_LITERAL_BIT | ACCESS_CHAIN_FORCE_COMPOSITE_BIT,
 			                                  &meta, nullptr);
+
+			reroll_composite_insert_extract(expr, type, type, expression_type(ops[2]), &ops[3], length);
+
 			e = &emit_op(result_type, id, expr, should_forward(ops[2]), should_suppress_usage_tracking(ops[2]));
 			inherit_expression_dependencies(id, ops[2]);
 		}
@@ -13857,6 +13952,7 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 		uint32_t composite = ops[3];
 		const auto *elems = &ops[4];
 		length -= 4;
+		auto &res_type = get<SPIRType>(result_type);
 
 		flush_variable_declaration(composite);
 
@@ -13884,7 +13980,7 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 		else if (backend.requires_relaxed_precision_analysis &&
 		         has_decoration(composite, DecorationRelaxedPrecision) !=
 		         has_decoration(id, DecorationRelaxedPrecision) &&
-		         get<SPIRType>(result_type).basetype != SPIRType::Struct)
+		         res_type.basetype != SPIRType::Struct)
 		{
 			// Similarly, if precision does not match for input and output,
 			// we cannot alias them. If we write a composite into a relaxed precision
@@ -13900,7 +13996,11 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 
 			auto chain = access_chain_internal(composite, elems, length, ACCESS_CHAIN_INDEX_IS_LITERAL_BIT,
 			                                   nullptr, nullptr);
-			statement(chain, " = ", to_unpacked_expression(obj), ";");
+			auto expr = to_unpacked_expression(obj);
+
+			reroll_composite_insert_extract(expr, expression_type(obj), res_type, res_type, elems, length);
+
+			statement(chain, " = ", expr, ";");
 			set<SPIRExpression>(id, to_expression(composite), result_type, true);
 			invalid_expressions.insert(composite);
 			composite_insert_overwritten.insert(composite);
@@ -13919,7 +14019,11 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 			}
 
 			auto chain = access_chain_internal(id, elems, length, ACCESS_CHAIN_INDEX_IS_LITERAL_BIT, nullptr, nullptr);
-			statement(chain, " = ", to_unpacked_expression(obj), ";");
+			auto expr = to_unpacked_expression(obj);
+
+			reroll_composite_insert_extract(expr, expression_type(obj), res_type, res_type, elems, length);
+
+			statement(chain, " = ", expr, ";");
 		}
 
 		break;
@@ -14537,6 +14641,10 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 		auto id = ops[1];
 		auto &type = get<SPIRType>(result_type);
 
+		// SPIR-V doesn't short circuit, but HLLs started doing that.
+		// This messes with subgroup operations, etc.
+		flush_control_dependent_expressions(current_emitting_block->self);
+
 		if (type.vecsize > 1)
 			emit_unrolled_binary_op(result_type, id, ops[2], ops[3], "||", false, SPIRType::Unknown);
 		else
@@ -14550,6 +14658,10 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 		auto result_type = ops[0];
 		auto id = ops[1];
 		auto &type = get<SPIRType>(result_type);
+
+		// SPIR-V doesn't short circuit, but HLLs started doing that at some point.
+		// This messes with subgroup operations, etc.
+		flush_control_dependent_expressions(current_emitting_block->self);
 
 		if (type.vecsize > 1)
 			emit_unrolled_binary_op(result_type, id, ops[2], ops[3], "&&", false, SPIRType::Unknown);
@@ -14941,6 +15053,85 @@ void CompilerGLSL::emit_instruction(const Instruction &instruction)
 		emit_unary_func_op_cast(ops[0], ops[1], ops[2], "bitCount", basetype, int_type);
 		break;
 	}
+
+	// SPV_INTEL_shader_integer_functions2
+	case OpUCountLeadingZerosINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		emit_unary_func_op_cast(ops[0], ops[1], ops[2], "countLeadingZeros", uint_type, uint_type);
+		break;
+
+	case OpUCountTrailingZerosINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		emit_unary_func_op_cast(ops[0], ops[1], ops[2], "countTrailingZeros", uint_type, uint_type);
+		break;
+
+	case OpAbsISubINTEL:
+	case OpAbsUSubINTEL:
+	{
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		string cast_op0, cast_op1;
+		auto input_type = opcode == OpAbsISubINTEL ? int_type : uint_type;
+		auto expected_type = binary_op_bitcast_helper(cast_op0, cast_op1, input_type, ops[2], ops[3], false);
+		expected_type.basetype = uint_type;
+		auto &out_type = get<SPIRType>(ops[0]);
+		auto expr = join("absoluteDifference(", cast_op0, ", ", cast_op1, ")");
+		if (out_type.basetype != uint_type)
+			expr = join(bitcast_glsl_op(out_type, expected_type), "(", expr, ")");
+		emit_op(ops[0], ops[1], expr, should_forward(ops[2]) && should_forward(ops[3]));
+		inherit_expression_dependencies(ops[1], ops[2]);
+		inherit_expression_dependencies(ops[1], ops[3]);
+		break;
+	}
+
+	case OpIAddSatINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(addSaturate, int_type);
+		break;
+
+	case OpUAddSatINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(addSaturate, uint_type);
+		break;
+
+	case OpIAverageINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(average, int_type);
+		break;
+
+	case OpUAverageINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(average, uint_type);
+		break;
+
+	case OpIAverageRoundedINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(averageRounded, int_type);
+		break;
+
+	case OpUAverageRoundedINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(averageRounded, uint_type);
+		break;
+
+	case OpISubSatINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(subtractSaturate, int_type);
+		break;
+
+	case OpUSubSatINTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(subtractSaturate, uint_type);
+		break;
+
+	case OpIMul32x16INTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(multiply32x16, int_type);
+		break;
+
+	case OpUMul32x16INTEL:
+		require_extension_internal("GL_INTEL_shader_integer_functions2");
+		GLSL_BFOP_CAST(multiply32x16, uint_type);
+		break;
 
 	// Atomics
 	case OpAtomicExchange:
@@ -17568,7 +17759,7 @@ string CompilerGLSL::image_type_glsl(const SPIRType &type, uint32_t id, bool /*m
 
 	// "Shadow" state in GLSL only exists for samplers and combined image samplers.
 	if (((type.basetype == SPIRType::SampledImage) || (type.basetype == SPIRType::Sampler)) &&
-	    is_depth_image(type, id))
+	    is_depth_image(id))
 	{
 		res += "Shadow";
 
@@ -20565,6 +20756,9 @@ void CompilerGLSL::emit_copy_logical_type(uint32_t lhs_id, uint32_t lhs_type_id,
 		{
 			auto &lhs_expr = set<SPIRExpression>(lhs_id, std::move(lhs), lhs_type_id, true);
 			lhs_expr.need_transpose = lhs_meta.need_transpose;
+			// The LHS names a member of the destination. Mark it as an access chain so that
+			// a physical pointer member is assigned as a value instead of being stored through.
+			lhs_expr.access_chain = true;
 
 			if (lhs_meta.storage_is_packed)
 				set_extended_decoration(lhs_id, SPIRVCrossDecorationPhysicalTypePacked);
@@ -20661,7 +20855,7 @@ void CompilerGLSL::emit_inout_fragment_outputs_copy_to_subpass_inputs()
 
 bool CompilerGLSL::variable_is_depth_or_compare(VariableID id) const
 {
-	return is_depth_image(get<SPIRType>(get<SPIRVariable>(id).basetype), id);
+	return is_depth_image(id);
 }
 
 const char *CompilerGLSL::ShaderSubgroupSupportHelper::get_extension_name(Candidate c)
